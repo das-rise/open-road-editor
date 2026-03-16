@@ -1,0 +1,956 @@
+"""OpenDRIVE display, editing and OSM→XODR conversion mixin."""
+
+import copy
+import hashlib
+import importlib
+import json
+import os
+from pathlib import Path
+import tempfile
+import threading
+
+# osm_to_xodr uses loguru with a default stderr sink — suppress it.
+from loguru import logger as _osm_to_xodr_logger
+from osm_to_xodr.config import NetconvertSettings
+from osm_to_xodr.netconvert import run_netconvert
+from osm_to_xodr.postprocess import convert_objects_to_signals
+
+_osm_to_xodr_logger.disable('osm_to_xodr')
+
+from PIL import Image
+from PyQt6.QtCore import (
+    QPointF,
+    Qt,
+    QTimer,
+)
+from PyQt6.QtGui import (
+    QBrush,
+    QColor,
+    QImage,
+    QPainterPath,
+    QPen,
+    QPixmap,
+    QPolygonF,
+)
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGraphicsPathItem,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QSpinBox,
+    QStyle,
+    QVBoxLayout,
+)
+
+from open_road_editor.constants import *  # noqa: F401,F403
+from open_road_editor.constants import _XODR_LANE_COLOR_DEFAULT, _XODR_LANE_COLORS  # noqa: F401
+
+opendrive_renderer_bindings_py = importlib.import_module('open_road_editor.viewer._xodr_renderer')
+
+
+class _XodrMixin:
+    """Mixin — see viewer/main.py for the assembled class."""
+
+    def pil_to_qpixmap(self, im):
+        if im is None:
+            return QPixmap()
+        im = im.convert('RGBA')
+        data = im.tobytes('raw', 'RGBA')
+        qim = QImage(data, im.size[0], im.size[1], QImage.Format.Format_RGBA8888)
+        return QPixmap.fromImage(qim)
+
+    def toggle_sidebar(self):
+        self._sidebar_visible = not self._sidebar_visible
+        if self._sidebar_visible:
+            # Restore sidebar: grow right pane back to saved width
+            total = self.splitter.width()
+            saved = getattr(self, '_sidebar_saved_width', SIDEBAR_DEFAULT_SAVED_WIDTH)
+            map_w = max(100, total - saved - TOGGLE_STRIP_WIDTH)  # toggle strip + handle
+            self.sidebar.setVisible(True)
+            self.splitter.setSizes([map_w, saved + TOGGLE_STRIP_WIDTH])
+            self.toggle_btn.setText('▶')
+        else:
+            # Save current right-pane width then collapse to toggle strip only
+            sizes = self.splitter.sizes()
+            self._sidebar_saved_width = (
+                max(SIDEBAR_MIN_WIDTH, sizes[1] - TOGGLE_STRIP_WIDTH)
+                if len(sizes) > 1
+                else SIDEBAR_DEFAULT_SAVED_WIDTH
+            )
+            self.sidebar.setVisible(False)
+            self.splitter.setSizes(
+                [self.splitter.width() - TOGGLE_STRIP_WIDTH, TOGGLE_STRIP_WIDTH]
+            )
+            self.toggle_btn.setText('◀')
+
+    def refresh_opendrive(self):
+        if not self.xodr_path:
+            self.opendrive_loading = False
+            if self.btn_browse_xodr:
+                self.btn_browse_xodr.setIcon(
+                    self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon)
+                )
+            if not self.check_opendrive.isChecked():
+                self.lbl_opendrive_status.setText('')
+            return
+
+        self.opendrive_loading = True
+        self.lbl_opendrive_status.setText('Loading...')
+        self.spinner_timer.start(SPINNER_TIMER_INTERVAL_MS)
+        self.btn_browse_xodr.setIcon(
+            self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)
+        )
+
+        def fetch():
+            # Vector path: build resolution-independent QPainterPath items
+            self.fetch_local_opendrive_vector(self.xodr_path)
+
+        threading.Thread(target=fetch, daemon=True).start()
+
+    def fetch_local_opendrive(self, xodr_path, on_progress):
+        # Local rendering logic
+        try:
+            renderer = opendrive_renderer_bindings_py.OpenDriveRenderer()
+            if not renderer.load_map(xodr_path):
+                print('Failed to load map locally')
+                on_progress(None, -1, -1)
+                return
+
+            min_x = self.map_ctx.world_bounds[0]
+            max_x = self.map_ctx.world_bounds[1]
+            min_y = self.map_ctx.world_bounds[2]
+            max_y = self.map_ctx.world_bounds[3]
+            width_meters = max_x - min_x
+            height_meters = max_y - min_y
+
+            if width_meters <= 0 or height_meters <= 0:
+                print('Invalid map_ctx dimensions for local render')
+                on_progress(None, -1, -1)
+                return
+
+            # Use the MPP calculated from arguments/metadata to match server resolution
+            render_mpp = self.map_ctx.mpp
+
+            # Check for reasonable image size to prevent memory exhaustion
+            w_px = int(width_meters / render_mpp)
+            h_px = int(height_meters / render_mpp)
+
+            # Warn if image is going to be massive
+            if w_px * h_px > MAX_RENDER_DIMENSION * MAX_RENDER_DIMENSION:
+                print(f'Warning: Rendered map will be huge ({w_px}x{h_px}). Capping resolution.')
+                max_dim = MAX_RENDER_DIMENSION
+                scale_factor = max(w_px / max_dim, h_px / max_dim)
+                render_mpp *= scale_factor
+                w_px = int(width_meters / render_mpp)
+                h_px = int(height_meters / render_mpp)
+
+            # For the local renderer, we need to pass arguments.
+            # We must check signature of opendrive_renderer_bindings_py.OpenDriveRenderer.render
+            # Usually: min_x, min_y, width, height, mpp, r, g, b, signals, objects...
+            # The current bindings (checked via grep) seem to take:
+            # render(min_x, min_y, width_px, height_px, mpp, ...)
+
+            # Bindings often expect float for geometry and int for dimensions
+            road_layer_arr = renderer.render(
+                min_x,
+                min_y,
+                w_px,
+                h_px,
+                render_mpp,
+                46,
+                52,
+                54,  # road color
+                True,
+                True,  # signals, objects
+            )
+
+            # Convert to PIL
+            if road_layer_arr is None:
+                print('Renderer returned None')
+                on_progress(None, -1, -1)
+                return
+
+            # Array shape is (height, width, 4) - BGRA usually from libOpenDRIVE?
+            # Actually let's assume RGBA from typical bindings usage or check
+            # In server.py: Image.fromarray(road_layer_arr, 'RGBA')
+            img = Image.fromarray(road_layer_arr, 'RGBA')
+
+            # Resize to match full mapper bounds if needed, but since we are replacing tiles
+            # we just show this one big image.
+            # However, the OpenDriveViewer expects tiles or handles one big image?
+            # on_opendrive_refreshed takes (image, count, total)
+            # and sets the pixmap.
+            # If we pass one big image, it will set it to the item.
+            # BUT the item needs to be positioned correctly if it's not covering 0,0 to W,H in scene coords?
+            # The scene is sized to `mapper.width_in_pixels` which is based on `min_meters_per_pixel` (zoom=max).
+            # If our local render has different resolution, we must scale it or adjust item transform.
+
+            # Creating a QPixmap from this image and letting the viewer handle it.
+            # The viewer code: self.opendrive_item.setPixmap(...)
+            # The item functions as background.
+            # If resolution differs from scene resolution, it will look small/large.
+            # We must scale the image to match `mapper.width_in_pixels` x `height_in_pixels`
+            # or set item scale.
+
+            target_w = self.map_ctx.width_in_pixels
+            target_h = self.map_ctx.height_in_pixels
+            if w_px != target_w or h_px != target_h:
+                img = img.resize((target_w, target_h), Image.NEAREST)
+
+            on_progress(img, 1, 1)
+            on_progress(None, -1, -1)  # Signal complete
+
+        except Exception as e:
+            print(f'Local rendering failed: {e}')
+            on_progress(None, -1, -1)
+
+    # ------------------------------------------------------------------
+    # Vector OpenDRIVE rendering (QPainterPath-based)
+    # ------------------------------------------------------------------
+
+    def fetch_local_opendrive_vector(self, xodr_path: str) -> None:
+        """Background thread: load XODR and emit lane polygons (no rasterisation)."""
+
+        def run():
+            try:
+                renderer = opendrive_renderer_bindings_py.OpenDriveRenderer()
+                if not renderer.load_map(xodr_path):
+                    print('fetch_local_opendrive_vector: failed to load map')
+                    self.opendrive_refreshed.emit(None, -1, -1)
+                    return
+                # s_step=1.0 m gives smooth curves without excessive memory use
+                polygons = renderer.get_lane_polygons(XODR_POLYGON_STEP_M)
+                self.xodr_polygons_ready.emit(polygons)
+            except Exception as exc:
+                print(f'fetch_local_opendrive_vector error: {exc}')
+                self.opendrive_refreshed.emit(None, -1, -1)
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _on_xodr_polygons_ready(self, polygons) -> None:
+        """Main-thread slot: convert LanePolygons to QGraphicsPathItems in the scene."""
+        self._clear_xodr_vector_items()
+
+        if not polygons or not self.map_ctx:
+            self.opendrive_refreshed.emit(None, -1, -1)
+            return
+
+        min_x = self.map_ctx.world_bounds[0]
+        min_y = self.map_ctx.world_bounds[2]
+        mpp = self.map_ctx.mpp
+
+        path_items: list = []
+        self._xodr_lane_points_scene.clear()
+        records: list = []
+        for poly in polygons:
+            pts = list(getattr(poly, 'points', []) or [])
+            if len(pts) < 3:
+                continue
+            lane_key = str(getattr(poly, 'lane_key', '') or '')
+            predecessor_key = str(getattr(poly, 'predecessor_key', '') or '')
+            successor_key = str(getattr(poly, 'successor_key', '') or '')
+            lane_type = str(getattr(poly, 'lane_type', '') or '')
+            scene_pts = [((wx - min_x) / mpp, (wy - min_y) / mpp) for wx, wy in pts]
+            records.append(
+                {
+                    'lane_key': lane_key,
+                    'topology_lane_key': lane_key,
+                    'predecessor_key': predecessor_key,
+                    'successor_key': successor_key,
+                    'lane_type': lane_type,
+                    'scene_points': scene_pts,
+                    'world_points': pts,
+                    'synthetic': False,
+                }
+            )
+
+        lane_key_counts: dict[str, int] = {}
+        for rec in records:
+            topo_key = str(rec.get('topology_lane_key') or '')
+            if topo_key:
+                lane_key_counts[topo_key] = lane_key_counts.get(topo_key, 0) + 1
+
+        seen_instance_keys: set[str] = set()
+        for rec in records:
+            topo_key = str(rec.get('topology_lane_key') or '')
+            instance_key = topo_key
+            if topo_key and lane_key_counts.get(topo_key, 0) > 1:
+                instance_key = self._xodr_duplicate_instance_lane_key(
+                    topo_key, rec.get('world_points') or []
+                )
+                suffix = 2
+                unique_instance_key = instance_key
+                while unique_instance_key in seen_instance_keys:
+                    unique_instance_key = f'{instance_key}:{suffix}'
+                    suffix += 1
+                instance_key = unique_instance_key
+            rec['lane_key'] = instance_key
+            if instance_key:
+                seen_instance_keys.add(instance_key)
+
+        for rec in records:
+            self._append_xodr_record_item(path_items, rec)
+
+        self._rebuild_xodr_connectivity_maps()
+
+        if not path_items:
+            self.opendrive_refreshed.emit(None, -1, -1)
+            return
+
+        group = self.scene.createItemGroup(path_items)
+        group.setZValue(self.opendrive_item.zValue())
+        self._xodr_vector_group = group
+        self._xodr_is_vector = True
+        self._apply_opendrive_layer_style()
+
+        # Trigger the normal "loading complete" flow
+        self.opendrive_refreshed.emit(None, -1, -1)
+
+    @staticmethod
+    def _xodr_pen_from_brush(brush: QBrush) -> QPen:
+        c = QColor(brush.color())
+        # Keep fill translucency but make edge coverage nearly opaque to hide
+        # residual raster seams between adjacent lane polygons.
+        c.setAlpha(max(c.alpha(), 230))
+        pen = QPen(c)
+        pen.setCosmetic(True)
+        pen.setWidthF(XODR_SEAM_PEN_WIDTH_PX)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        return pen
+
+    def _set_xodr_item_fill(self, item, brush: QBrush) -> None:
+        item.setBrush(brush)
+        item.setPen(self._xodr_pen_from_brush(brush))
+
+    def _parse_lane_key_for_orbit(self, lane_key: str) -> tuple[str, str, int]:
+        """Parse lane_key into (road_id, section_s_str, lane_id) for ORBIT."""
+        text = str(lane_key or '').strip()
+        # Drop transient slice/instance suffixes used only in viewer state.
+        # Examples:
+        #   road/0.0/-1::slice:0
+        #   road/0.0/-1@@abc123
+        #   road/0.0/-1:2
+        base_text = text
+        if '::slice:' in base_text:
+            base_text = base_text.split('::slice:', 1)[0]
+        if '@@' in base_text:
+            base_text = base_text.split('@@', 1)[0]
+        if ':' in base_text:
+            base_text = base_text.split(':', 1)[0]
+
+        parts = base_text.split('/')
+        if len(parts) == 3:
+            road_id, section_s, lane_id_str = [p.strip() for p in parts]
+            if road_id and section_s and lane_id_str:
+                try:
+                    lane_id = int(lane_id_str)
+                except (ValueError, TypeError):
+                    lane_id = 0
+                try:
+                    section_s = f'{float(section_s):.6f}'
+                except Exception:
+                    pass
+                return road_id, section_s, lane_id
+
+        return text, '0.0', 0
+
+    def _append_xodr_record_item(self, path_items: list, rec: dict) -> None:
+        scene_pts = rec.get('scene_points') or []
+        if len(scene_pts) < 3:
+            return
+
+        lane_key = str(rec.get('lane_key') or '')
+        lane_type = str(rec.get('lane_type') or '')
+        predecessor_key = str(rec.get('predecessor_key') or '')
+        successor_key = str(rec.get('successor_key') or '')
+        is_synthetic = bool(rec.get('synthetic'))
+
+        base_color = _XODR_LANE_COLORS.get(lane_type, _XODR_LANE_COLOR_DEFAULT)
+        brush = QBrush(QColor(*base_color))
+
+        poly = QPolygonF([QPointF(sx, sy) for sx, sy in scene_pts])
+        path = QPainterPath()
+        path.addPolygon(poly)
+        item = QGraphicsPathItem(path)
+        item.setAcceptHoverEvents(True)
+        self._set_xodr_item_fill(item, brush)
+
+        topo_key = str(rec.get('topology_lane_key') or lane_key)
+        self._xodr_item_meta[item] = (lane_key, predecessor_key, successor_key, brush, topo_key)
+        self._xodr_lane_key_to_item[lane_key] = item
+        self._xodr_topology_key_to_items.setdefault(topo_key, []).append(item)
+
+        if not is_synthetic and lane_key:
+            self._xodr_lane_points_scene[lane_key] = scene_pts
+
+        path_items.append(item)
+
+    def _xodr_duplicate_instance_lane_key(base_lane_key: str, world_points: list) -> str:
+        if not base_lane_key:
+            return ''
+        sample_points = list(world_points or [])
+        if len(sample_points) > 8:
+            sample_points = sample_points[:4] + sample_points[-4:]
+        payload = '|'.join(f'{float(x):.3f},{float(y):.3f}' for x, y in sample_points)
+        digest = hashlib.sha1(payload.encode('utf-8')).hexdigest()[:12]
+        return f'{base_lane_key}@@{digest}'
+
+    @staticmethod
+    def _xodr_meta_topology_key(meta) -> str:
+        if not meta:
+            return ''
+        if len(meta) >= 5:
+            return str(meta[4] or '')
+        return str(meta[0] or '')
+
+    def _xodr_items_for_topology_key(self, topology_key: str) -> list:
+        topology_key = str(topology_key or '')
+        if not topology_key:
+            return []
+        return list(self._xodr_topology_key_to_items.get(topology_key) or [])
+
+    def _xodr_item_for_lane_key_or_topology_key(self, lane_key: str):
+        lane_key = str(lane_key or '')
+        if not lane_key:
+            return None
+        item = self._xodr_lane_key_to_item.get(lane_key)
+        if item is not None:
+            return item
+        cands = self._xodr_items_for_topology_key(lane_key)
+        if len(cands) == 1:
+            return cands[0]
+        return None
+
+    def _rebuild_xodr_connectivity_maps(self) -> None:
+        self._xodr_pred_back.clear()
+        self._xodr_succ_back.clear()
+        for item, meta in self._xodr_item_meta.items():
+            lane_key = str(meta[0] or '')
+            pred_key = str(meta[1] or '')
+            succ_key = str(meta[2] or '')
+            if not lane_key or lane_key not in self._xodr_lane_key_to_item:
+                continue
+            if pred_key:
+                self._xodr_pred_back.setdefault(pred_key, []).append(item)
+            if succ_key:
+                self._xodr_succ_back.setdefault(succ_key, []).append(item)
+
+    def _clear_xodr_vector_items(self) -> None:
+        """Remove the vector OpenDRIVE item group from the scene, if present."""
+        if self._xodr_vector_group is not None:
+            # Remove every child path item from the scene explicitly *before*
+            # touching the group.  Qt's destroyItemGroup() reparents children to
+            # the scene as top-level items, restoring their own visible=True state
+            # and leaving permanent orphan items on screen.  Removing children
+            # directly avoids that leak.
+            for item in list(self._xodr_vector_group.childItems()):
+                self.scene.removeItem(item)
+            self.scene.removeItem(self._xodr_vector_group)
+            self._xodr_vector_group = None
+        self._xodr_item_meta.clear()
+        self._xodr_lane_key_to_item.clear()
+        self._xodr_topology_key_to_items.clear()
+        self._xodr_pred_back.clear()
+        self._xodr_succ_back.clear()
+        self._xodr_lane_points_scene.clear()
+        self._xodr_is_vector = False
+
+    # ------------------------------------------------------------------
+    # OSM file layer
+    # ------------------------------------------------------------------
+
+    def browse_osm(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            'Select OSM File',
+            '',
+            'OpenStreetMap Files (*.osm *.xml);;All Files (*)',
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if file_path:
+            if self.xodr_path:
+                reply = QMessageBox.question(
+                    self,
+                    'Confirm Import',
+                    'An OpenDRIVE file is already loaded. Importing OSM will clear it. Continue?',
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                if reply == QMessageBox.StandardButton.No:
+                    return
+                self.edit_xodr.setText('')
+            self.edit_osm.setText(file_path)
+
+    def _normalize_osm2xodr_settings(self, raw_settings) -> dict:
+        merged = copy.deepcopy(DEFAULT_OSM2XODR_SETTINGS)
+        parsed = None
+        if isinstance(raw_settings, dict):
+            parsed = raw_settings
+        elif isinstance(raw_settings, str):
+            try:
+                obj = json.loads(raw_settings)
+                if isinstance(obj, dict):
+                    parsed = obj
+            except Exception:
+                parsed = None
+        if isinstance(parsed, dict):
+            for section, options in OSM2XODR_SCHEMA:
+                src_section = parsed.get(section)
+                if not isinstance(src_section, dict):
+                    continue
+                for key, _, _ in options:
+                    if key in src_section:
+                        merged[section][key] = str(src_section[key]).strip()
+        return merged
+
+    @staticmethod
+    def _as_bool_string(value) -> str:
+        return 'true' if str(value).strip().lower() in ('1', 'true', 'yes', 'on') else 'false'
+
+    def _build_netconvert_settings(self) -> NetconvertSettings:
+        """Build a NetconvertSettings instance from the current UI settings dict."""
+        flat: dict = {}
+        for section, options in OSM2XODR_SCHEMA:
+            for key, field_type, default in options:
+                raw = self._osm2xodr_settings.get(section, {}).get(key, default)
+                try:
+                    if field_type == 'bool':
+                        flat[key] = str(raw).strip().lower() in ('1', 'true', 'yes', 'on')
+                    elif field_type == 'float':
+                        flat[key] = float(raw)
+                    elif field_type == 'int':
+                        flat[key] = int(float(raw))
+                    else:
+                        flat[key] = str(raw)
+                except Exception:
+                    pass  # leave field at NetconvertSettings default
+        return NetconvertSettings(**flat)
+
+    def _call_netconvert_conversion(self, osm_path: str, xodr_path: str) -> tuple[bool, str]:
+        """Run netconvert via osm-to-xodr's subprocess wrapper using our scene projection.
+
+        Returns (success, error_message).
+        """
+        lat = self.spin_origin_lat.value()
+        lon = self.spin_origin_lon.value()
+        proj_str = f'+proj=tmerc +lat_0={lat:.6f} +lon_0={lon:.6f}'
+        nc = self._build_netconvert_settings()
+        osm_file = Path(osm_path).resolve()
+        output_file = Path(xodr_path).resolve()
+        args = [
+            '--osm-files',
+            str(osm_file),
+            '--opendrive-output',
+            str(output_file),
+            f'--opendrive-output.shape-match-dist={nc.shape_match_dist}',
+            '--output.street-names=true',
+            '--output.original-names=true',
+            # Custom scene projection instead of the library's hardcoded --proj.utm
+            '--proj',
+            proj_str,
+            '--offset.disable-normalization=true',
+            f'--aggregate-warnings={nc.aggregate_warnings}',
+            # Geometry
+            f'--geometry.remove={"true" if nc.remove_geometry else "false"}',
+            '--geometry.max-grade.fix=true',
+            '--geometry.min-dist=0.5',
+            # Junctions
+            f'--roundabouts.guess={"true" if nc.guess_roundabouts else "false"}',
+            f'--ramps.guess={"true" if nc.guess_ramps else "false"}',
+            '--edges.join=true',
+            '--junctions.join=false',
+            f'--junctions.join-dist={nc.junction_join_dist}',
+            '--junctions.join-same=10',
+            f'--junctions.corner-detail={nc.junction_corner_detail}',
+            f'--junctions.scurve-stretch={nc.junction_scurve_stretch}',
+            '--rectangular-lane-cut=true',
+            f'--no-turnarounds={"true" if nc.no_turnarounds else "false"}',
+            # OSM import
+            '--osm.all-attributes=true',
+            '--osm.layer-elevation=4',
+            '--osm.layer-elevation.max-grade=5',
+            f'--osm.turn-lanes={"true" if nc.import_turn_lanes else "false"}',
+            '--osm.lane-access=true',
+            f'--osm.sidewalks={"true" if nc.import_sidewalks else "false"}',
+            f'--osm.bike-access={"true" if nc.import_bike_access else "false"}',
+            f'--osm.crossings={"true" if nc.import_crossings else "false"}',
+            # Traffic lights
+            f'--tls.guess-signals={"true" if nc.guess_tls_signals else "false"}',
+            '--tls.discard-simple=true',
+            '--tls.join=true',
+            '--tls.group-signals=true',
+            '--tls.default-type=actuated',
+            '--crossings.guess=false',
+            '--sidewalks.guess=false',
+            '--sidewalks.guess.from-permissions=false',
+            '--bikelanes.guess=false',
+            '--bikelanes.guess.from-permissions=false',
+            # Defaults
+            f'--default.lanewidth={nc.lane_width}',
+            f'--default.sidewalk-width={nc.sidewalk_width}',
+            f'--default.bikelane-width={nc.bikelane_width}',
+            f'--default.crossing-width={nc.crossing_width}',
+            '--remove-edges.isolated=true',
+        ]
+        result = run_netconvert(args, cwd=osm_file.parent)
+        if not result.success or not output_file.exists():
+            return False, (result.stderr or result.stdout or 'Unknown error').strip()
+        # Post-process: convert <object> elements to <signal> elements
+        convert_objects_to_signals(output_file)
+        return True, ''
+
+    def _open_osm2xodr_settings_dialog(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle('OSM to OpenDRIVE Conversion Settings')
+        dialog.resize(760, 520)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(
+            QLabel('These settings are passed to osm-to-xodr (SUMO netconvert) for OSM import.')
+        )
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        editors = {}
+        for section, options in OSM2XODR_SCHEMA:
+            section_lbl = QLabel(f'<b>{section}</b>')
+            form.addRow(section_lbl, QLabel(''))
+            for key, field_type, default in options:
+                current = self._osm2xodr_settings.get(section, {}).get(key, default)
+                if field_type == 'bool':
+                    widget = QCheckBox()
+                    widget.setChecked(self._as_bool_string(current) == 'true')
+                elif field_type == 'int':
+                    widget = QSpinBox()
+                    widget.setRange(0, 9999)
+                    try:
+                        widget.setValue(int(float(current)))
+                    except Exception:
+                        widget.setValue(int(float(default)))
+                elif field_type == 'float':
+                    widget = QDoubleSpinBox()
+                    widget.setDecimals(6)
+                    widget.setRange(0.0, 100.0)
+                    widget.setSingleStep(0.05)
+                    try:
+                        widget.setValue(float(current))
+                    except Exception:
+                        widget.setValue(float(default))
+                else:
+                    widget = QLineEdit(str(current))
+                editors[(section, key, field_type)] = widget
+                form.addRow(f'{key}:', widget)
+        layout.addLayout(form)
+
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        btn_defaults = button_box.addButton(
+            'Restore Defaults', QDialogButtonBox.ButtonRole.ResetRole
+        )
+
+        def _restore_defaults():
+            for section, options in OSM2XODR_SCHEMA:
+                for key, field_type, default in options:
+                    widget = editors[(section, key, field_type)]
+                    if field_type == 'bool':
+                        widget.setChecked(default == 'true')
+                    elif field_type == 'int':
+                        widget.setValue(int(float(default)))
+                    elif field_type == 'float':
+                        widget.setValue(float(default))
+                    else:
+                        widget.setText(default)
+
+        btn_defaults.clicked.connect(_restore_defaults)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        updated = copy.deepcopy(DEFAULT_OSM2XODR_SETTINGS)
+        for section, options in OSM2XODR_SCHEMA:
+            for key, field_type, default in options:
+                widget = editors[(section, key, field_type)]
+                if field_type == 'bool':
+                    updated[section][key] = 'true' if widget.isChecked() else 'false'
+                elif field_type == 'int':
+                    updated[section][key] = str(int(widget.value()))
+                elif field_type == 'float':
+                    value = widget.value()
+                    updated[section][key] = ('%.6f' % value).rstrip('0').rstrip('.')
+                else:
+                    text = widget.text().strip()
+                    updated[section][key] = text if text else default
+
+        self._osm2xodr_settings = updated
+        self._show_project_status('Updated OSM conversion settings')
+
+    def _convert_osm_to_xodr(self, osm_path: str) -> str | None:
+        try:
+            xodr_fd, xodr_path = tempfile.mkstemp(suffix='.xodr', prefix='osm2xodr_')
+            os.close(xodr_fd)
+            success, err = self._call_netconvert_conversion(osm_path, xodr_path)
+            if success:
+                return xodr_path
+            QMessageBox.warning(self, 'OSM Conversion Failed', err or 'Unknown error')
+            return None
+        except Exception as exc:
+            QMessageBox.warning(self, 'OSM Conversion Failed', f'Conversion error:\n{exc}')
+            return None
+
+    def _flush_pending_osm_panel_edits(self) -> None:
+        sel = self._osm_selected_item
+        if sel is None:
+            return
+        # Ensure selected geometry edits are synced from scene coords to
+        # lat/lon node refs before save/refresh compose.
+        meta = self._osm_item_meta.get(sel)
+        if meta and len(meta[3]) == len(meta[6]):
+            updated_refs = []
+            updated_latlon = []
+            for i, (nid, _lat_old, _lon_old) in enumerate(meta[6]):
+                sx, sy = meta[3][i]
+                lat, lon = self._scene_to_latlon(float(sx), float(sy))
+                updated_refs.append((str(nid), float(lat), float(lon)))
+                updated_latlon.append((float(lat), float(lon)))
+            meta[6][:] = updated_refs
+            meta[4][:] = updated_latlon
+            way_id = str(meta[5])
+            if way_id in self._osm_created_ways:
+                self._osm_created_ways[way_id]['node_coords'] = list(updated_refs)
+            else:
+                edit = self._osm_edits.setdefault(way_id, {})
+                edit['node_coords'] = list(updated_refs)
+        if self._osm_tags_edit_mode:
+            self._on_osm_tag_edited(sel)
+            self._osm_tags_edit_mode = False
+        for rel in ('preceding', 'succeeding'):
+            if bool(self._osm_relation_edit_mode.get(rel, False)):
+                self._commit_relation_edit(sel, rel, reselection=False)
+                self._osm_relation_edit_mode[rel] = False
+                self._osm_relation_draft[rel] = None
+        if self._osm_relation_pick_mode is not None:
+            self._osm_relation_pick_mode = None
+        self._osm_show_props(sel)
+
+    def _schedule_auto_xodr_refresh(self) -> None:
+        """Restart the debounce timer that auto-refreshes XODR after an OSM drag."""
+        if not getattr(self, 'check_opendrive', None) or not self.check_opendrive.isChecked():
+            return
+        if not getattr(self, '_auto_xodr_refresh_timer', None):
+            self._auto_xodr_refresh_timer = QTimer(self)
+            self._auto_xodr_refresh_timer.setSingleShot(True)
+            self._auto_xodr_refresh_timer.timeout.connect(self._do_auto_xodr_refresh)
+        # Bump generation so any in-flight conversion thread discards its result.
+        self._auto_xodr_gen = getattr(self, '_auto_xodr_gen', 0) + 1
+        self._show_project_status('OpenDRIVE refresh pending…')
+        self._set_xodr_layer_dimmed(True)
+        self._auto_xodr_refresh_timer.start(400)
+
+    def _do_auto_xodr_refresh(self) -> None:
+        """Compose current OSM content and run osm-to-xodr in a background thread."""
+        self._flush_pending_osm_panel_edits()
+        osm_content = self._compose_current_osm_content()
+        if osm_content is None:
+            osm_content = self._osm_content
+        if not osm_content:
+            return
+        # Clip to world bounds so conversion processes only the visible area.
+        osm_content = self._clip_osm_content_to_world_bounds(osm_content)
+        try:
+            fd, temp_osm_path = tempfile.mkstemp(suffix='.osm', prefix='osm2xodr_auto_')
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write(osm_content)
+            xodr_fd, xodr_path = tempfile.mkstemp(suffix='.xodr', prefix='osm2xodr_auto_')
+            os.close(xodr_fd)
+        except Exception:
+            return
+        self._show_project_status('Converting OSM → OpenDRIVE…')
+        my_gen = getattr(self, '_auto_xodr_gen', 0)
+
+        def run():
+            try:
+                success, _err = self._call_netconvert_conversion(temp_osm_path, xodr_path)
+                if my_gen != getattr(self, '_auto_xodr_gen', 0):
+                    return  # superseded by a later drag
+                self.xodr_auto_converted.emit(xodr_path if success else '')
+            except Exception:
+                if my_gen == getattr(self, '_auto_xodr_gen', 0):
+                    self.xodr_auto_converted.emit('')
+
+        threading.Thread(target=run, daemon=True).start()
+
+    def _set_xodr_layer_dimmed(self, dimmed: bool) -> None:
+        """Lower/restore opacity of the XODR vector layer to signal refresh state."""
+        opacity = 0.25 if dimmed else 1.0
+        if self._xodr_vector_group is not None:
+            self._xodr_vector_group.setOpacity(opacity)
+
+    def _on_xodr_auto_converted(self, xodr_path: str) -> None:
+        """Main-thread slot: apply background OSM→XODR result and re-render."""
+        self._set_xodr_layer_dimmed(False)
+        if not xodr_path:
+            self._show_project_status('OpenDRIVE auto-refresh failed')
+            return
+        self._suppress_next_xodr_title_update = True
+        self.edit_xodr.setText(xodr_path)
+        self._arrange_import_layers(show_xodr=True, show_osm=True, osm_first=True)
+        self._show_project_status('OpenDRIVE auto-refreshed')
+        self.refresh_opendrive()
+
+    def _refresh_opendrive_from_osm(self) -> None:
+        if not self.osm_path:
+            QMessageBox.information(
+                self,
+                'No OSM Loaded',
+                'Load an OSM file first to regenerate OpenDRIVE.',
+            )
+            return
+
+        # Ensure conversion uses latest in-memory OSM edits.
+        self._flush_pending_osm_panel_edits()
+
+        osm_content = self._compose_current_osm_content()
+        if osm_content is None:
+            osm_content = self._osm_content
+        if not osm_content:
+            QMessageBox.warning(
+                self,
+                'OSM Conversion Failed',
+                'No OSM content is available for conversion.',
+            )
+            return
+
+        try:
+            fd, temp_osm_path = tempfile.mkstemp(suffix='.osm', prefix='osm2xodr_input_')
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write(osm_content)
+        except Exception as exc:
+            QMessageBox.warning(
+                self, 'OSM Conversion Failed', f'Could not prepare OSM input:\n{exc}'
+            )
+            return
+
+        generated_xodr = self._convert_osm_to_xodr(temp_osm_path)
+        if not generated_xodr:
+            return
+
+        self._suppress_next_xodr_title_update = True
+        self.edit_xodr.setText(generated_xodr)
+        self.check_opendrive.setChecked(True)
+        self._arrange_import_layers(show_xodr=True, show_osm=True, osm_first=True)
+        self._show_project_status('OpenDRIVE refreshed from current OSM')
+
+    def _export_osm_only(self) -> None:
+        self._flush_pending_osm_panel_edits()
+        osm_content = self._compose_current_osm_content()
+        if osm_content is None:
+            osm_content = self._osm_content
+        if not osm_content:
+            QMessageBox.warning(
+                self,
+                'Export Failed',
+                'No OSM content is available to export.',
+            )
+            return
+
+        osm_content = self._clip_osm_content_to_world_bounds(osm_content)
+
+        default_dir = ''
+        base_name = ''
+        if self.project_file_path:
+            default_dir = os.path.dirname(self.project_file_path)
+            base_name = os.path.splitext(os.path.basename(self.project_file_path))[0]
+        elif self.osm_path:
+            default_dir = os.path.dirname(self.osm_path)
+            base_name = os.path.splitext(os.path.basename(self.osm_path))[0]
+        elif self.town_name:
+            base_name = self.town_name
+
+        if not default_dir:
+            default_dir = os.path.expanduser('~')
+        if not base_name:
+            base_name = 'exported_project'
+
+        default_path = os.path.join(default_dir, f'{base_name}.osm')
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            'Export OSM',
+            default_path,
+            'OSM Files (*.osm);;All Files (*)',
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if not file_path:
+            return
+        if not os.path.splitext(file_path)[1]:
+            file_path += '.osm'
+
+        try:
+            with open(file_path, 'w', encoding='utf-8') as handle:
+                handle.write(osm_content)
+                if not osm_content.endswith('\n'):
+                    handle.write('\n')
+            self._show_project_status(f'Exported OSM: {os.path.basename(file_path)}')
+        except Exception as exc:
+            QMessageBox.warning(self, 'Export Failed', f'Could not export OSM:\n{exc}')
+
+    def _export_xodr_file(self) -> None:
+        default_dir = ''
+        base_name = ''
+        if self.project_file_path:
+            default_dir = os.path.dirname(self.project_file_path)
+            base_name = os.path.splitext(os.path.basename(self.project_file_path))[0]
+        else:
+            preferred_dir = str(self._preferred_project_save_dir or '').strip()
+            if preferred_dir and os.path.isdir(preferred_dir):
+                default_dir = preferred_dir
+            else:
+                default_dir = os.path.expanduser('~')
+            if self.town_name:
+                base_name = self.town_name
+
+        if not base_name:
+            base_name = 'exported_opendrive'
+        default_path = os.path.join(default_dir, f'{base_name}.xodr')
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            'Export OpenDRIVE',
+            default_path,
+            'OpenDRIVE Files (*.xodr);;All Files (*)',
+            options=QFileDialog.Option.DontUseNativeDialog,
+        )
+        if not file_path:
+            return
+        if not os.path.splitext(file_path)[1]:
+            file_path += '.xodr'
+
+        # Export should mirror the currently loaded OpenDRIVE content exactly.
+        xodr_content = self._current_xodr_content()
+        if not xodr_content:
+            QMessageBox.warning(
+                self,
+                'Export Failed',
+                'No OpenDRIVE content is available to export.',
+            )
+            return
+
+        if self._project_storage_mode() != 'ore':
+            xodr_content = self._clip_xodr_content_to_world_bounds(xodr_content, invert_y=False)
+
+        try:
+            with open(file_path, 'w', encoding='utf-8') as handle:
+                handle.write(xodr_content)
+                if not xodr_content.endswith('\n'):
+                    handle.write('\n')
+            self._show_project_status(f'Exported OpenDRIVE: {os.path.basename(file_path)}')
+        except Exception as exc:
+            QMessageBox.warning(self, 'Export Failed', f'Could not export OpenDRIVE:\n{exc}')

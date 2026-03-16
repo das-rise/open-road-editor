@@ -1,0 +1,6 @@
+[submodule "open_road_editor/external/ORBIT"]
+	path = open_road_editor/external/ORBIT
+	url = https://github.com/RI-SE/ORBIT.git
+[submodule "open_road_editor/external/osm-to-xodr"]
+	path = open_road_editor/external/osm-to-xodr
+	url = https://github.com/das-rise/osm-to-xodr.git

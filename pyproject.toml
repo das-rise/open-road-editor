@@ -1,0 +1,66 @@
+[project]
+name = "open-road-editor"
+version = "0.1.0"
+description = "OpenRoadEditor - OSM and OpenDRIVE road network editor"
+requires-python = ">=3.12"
+keywords = ["opendrive", "osm", "road-network", "gis", "editor", "viewer"]
+license = {text = "GPL-3.0"}
+dependencies = [
+    "lxml>=4.9.0",
+    "numpy>=1.24.0",
+    "opencv-python-headless>=4.8.0",
+    "orbit>=0.7.0",
+    "osm-to-xodr>=0.3.0",
+    "Pillow>=9.0.0",
+    "pyproj>=3.6.0",
+    "pyqt6>=6.6.0",
+    "pyqt6-qt6>=6.6.0",
+    "scipy>=1.11.0",
+    "xmlschema>=4.2.0",
+]
+
+[project.scripts]
+open-road-editor = "open_road_editor.cli:main"
+ore = "open_road_editor.cli:main"
+
+[tool.uv.sources]
+orbit = { path = "open_road_editor/external/ORBIT", editable = true }
+osm-to-xodr = { path = "open_road_editor/external/osm-to-xodr", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["open_road_editor"]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+    "ruff>=0.8.0",
+]
+
+[tool.ruff]
+# Allow lines to be as long as 99
+line-length = 99
+
+[tool.ruff.lint]
+# Select E (PEP8), W (warnings), F (pyflakes), C (complexity), Q (quotes), I (imports)
+select = ["E", "F", "W", "C", "Q", "I"]
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+docstring-quotes = "double"
+
+[tool.ruff.format]
+quote-style = "single"
+docstring-code-format = true
+docstring-code-line-length = 99
+
+[tool.ruff.lint.isort]
+known-first-party = []
+known-third-party = []
+force-sort-within-sections = true
+order-by-type = false
