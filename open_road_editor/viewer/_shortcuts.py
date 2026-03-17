@@ -394,6 +394,12 @@ class _ShortcutsMixin:
             self._osm_tags_edit_mode = False
             sel = self._osm_selected_item
             if sel is not None:
+                try:
+                    # Persist any pending tag edits before re-populating the UI
+                    if hasattr(self, '_on_osm_tag_edited'):
+                        self._on_osm_tag_edited(sel)
+                except Exception:
+                    pass
                 self._osm_show_props(sel)
             return
         if not self._osm_edit_enabled():

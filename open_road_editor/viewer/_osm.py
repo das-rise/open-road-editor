@@ -977,6 +977,12 @@ class _OsmMixin:
             edit['tags'] = dict(new_tags)
         self._mark_osm_dirty()
         self._update_osm_export_btn()
+        # After editing tags, schedule an OpenDRIVE refresh from current OSM
+        try:
+            if hasattr(self, '_schedule_auto_xodr_refresh'):
+                self._schedule_auto_xodr_refresh()
+        except Exception:
+            pass
 
     def _on_osm_tag_delete(self, row_widget, item) -> None:
         """Remove a tag row and update."""
