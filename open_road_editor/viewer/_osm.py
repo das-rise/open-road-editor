@@ -94,11 +94,11 @@ class _OsmMixin:
 
         def run():
             try:
-                ways, tree = self._parse_osm(path)
-                self.osm_ways_ready.emit((ways, tree))
+                ways, signs, tree = self._parse_osm(path)
+                self.osm_ways_ready.emit((ways, signs, tree))
             except Exception as exc:
                 print(f'refresh_osm error: {exc}')
-                self.osm_ways_ready.emit(([], None))
+                self.osm_ways_ready.emit(([], [], None))
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -106,27 +106,58 @@ class _OsmMixin:
     def _parse_osm(path: str):
         """Parse an OSM XML file.
 
-        Returns ``(ways, tree)`` where *ways* is a list of
+        Returns ``(ways, signs, tree)`` where *ways* is a list of
         ``(highway, [(lat, lon)…], tags_dict, way_id, [(node_id, lat, lon)…])``
-        tuples and *tree* is the parsed :class:`ET.ElementTree` (kept read-only
-        for later export).
+        tuples, *signs* is a list of ``(lat, lon, tags_dict, node_id)`` tuples,
+        and *tree* is the parsed :class:`ET.ElementTree`.
         """
         tree = ET.parse(path)
         root = tree.getroot()
 
-        # Build node-id → (lat, lon) index
+        detail_tags = {
+            'traffic_sign',
+            'maxspeed',
+            'natural',  # for tree
+            'amenity',  # for parking
+            'barrier',  # for guard_rail
+            'traffic_signals',
+        }
+        detail_highway_values = {
+            'traffic_signals',
+            'give_way',
+            'stop',
+            'crossing',
+            'street_lamp',
+            'bus_stop',
+            'turning_circle',
+        }
+
+        # Build node-id → (lat, lon, tags) index
         nodes: dict = {}
+        signs: list = []
         for node in root.iter('node'):
             nid = node.get('id')
+            tags: dict = {}
+            is_interesting = False
+            for tag in node.iter('tag'):
+                k = tag.get('k', '')
+                v = tag.get('v', '')
+                if k:
+                    tags[k] = v
+                    if k in detail_tags or (k == 'highway' and v in detail_highway_values):
+                        is_interesting = True
             try:
-                nodes[nid] = (float(node.get('lat')), float(node.get('lon')))
+                lat, lon = float(node.get('lat')), float(node.get('lon', '0'))
+                nodes[nid] = (lat, lon)
+                if is_interesting:
+                    signs.append((lat, lon, tags, nid))
             except (TypeError, ValueError):
                 pass
 
         # Collect ways that carry a highway tag
         ways = []
         for way in root.iter('way'):
-            tags: dict = {}
+            tags = {}
             for tag in way.iter('tag'):
                 k = tag.get('k', '')
                 v = tag.get('v', '')
@@ -146,7 +177,36 @@ class _OsmMixin:
                     coords.append((lat, lon))
             if len(coords) >= 2:
                 ways.append((highway, coords, tags, way_id, node_refs))
-        return ways, tree
+
+        # Compute road bearing for give_way nodes so the triangle can be oriented
+        # bearing_by_nid maps node_id → angle in degrees (0=north, clockwise)
+        bearing_by_nid: dict = {}
+        give_way_nids = {nid for _, _, stags, nid in signs if stags.get('highway') == 'give_way'}
+        if give_way_nids:
+            for _, _, _, _, node_refs in ways:
+                for idx, (ref, _lat, _lon) in enumerate(node_refs):
+                    if ref not in give_way_nids:
+                        continue
+                    # Use the segment arriving at this node (prev → cur)
+                    if idx > 0:
+                        prev_lat, prev_lon = node_refs[idx - 1][1], node_refs[idx - 1][2]
+                        cur_lat, cur_lon = _lat, _lon
+                    elif idx < len(node_refs) - 1:
+                        # node is first; use departure direction (cur → next)
+                        prev_lat, prev_lon = _lat, _lon
+                        cur_lat, cur_lon = node_refs[idx + 1][1], node_refs[idx + 1][2]
+                    else:
+                        continue
+                    d_lat = cur_lat - prev_lat
+                    d_lon = cur_lon - prev_lon
+                    # atan2 in screen-space: lon → x (right), lat → y (up, but screen y is down)
+                    angle_deg = math.degrees(math.atan2(d_lon, d_lat))
+                    bearing_by_nid[ref] = angle_deg  # last encountered way wins
+
+        # Attach bearing (or None) as 5th element to each sign
+        signs = [(lat, lon, stags, nid, bearing_by_nid.get(nid))
+                 for lat, lon, stags, nid in signs]
+        return ways, signs, tree
 
     def _on_osm_ways_ready(self, result) -> None:
         """Main-thread slot: convert parsed OSM ways into QGraphicsPathItems in the scene."""
@@ -155,10 +215,10 @@ class _OsmMixin:
         mark_dirty_after_load = self._mark_osm_dirty_after_load
         self._mark_osm_dirty_after_load = False
 
-        if isinstance(result, tuple) and len(result) == 2:
-            ways, tree = result
+        if isinstance(result, tuple) and len(result) == 3:
+            ways, signs, tree = result
         else:
-            ways, tree = result if result else [], None
+            ways, signs, tree = result if result else [], [], None
 
         if not ways or not self.map_ctx:
             self.lbl_osm_status.setText('No roads found' if ways is not None else '')
@@ -240,6 +300,83 @@ class _OsmMixin:
                 way_id,
                 list(node_refs),
             )
+
+        # Draw signs (non-interactable)
+        for lat, lon, tags, nid, bearing in signs:
+            px, py = latlon_to_scene(lat, lon)
+
+            # Determine color based on tag type
+            hw = tags.get('highway', '')
+            if hw == 'give_way':
+                # Yield sign: equilateral triangle, white fill, red border.
+                # The triangle apex points *against* the direction of travel
+                # (toward oncoming traffic), which is the standard orientation.
+                s = 6.0  # half-width of the base
+                h = s * math.sqrt(3)  # height of equilateral triangle
+
+                # Build triangle in local coords centred on origin, apex pointing up (north)
+                apex   = QPointF(0.0,  -h * 2 / 3)
+                bl     = QPointF(-s,    h / 3)
+                br     = QPointF( s,    h / 3)
+
+                # Rotate each point by the road bearing so apex faces oncoming traffic.
+                # bearing is the direction the road *travels* (prev→cur), so we
+                # want the apex pointing back along that direction (bearing + 180).
+                rot_deg = bearing if bearing is not None else 0.0
+                rot_rad = math.radians(rot_deg)
+                cos_r, sin_r = math.cos(rot_rad), math.sin(rot_rad)
+
+                def _rot(pt: QPointF) -> QPointF:
+                    return QPointF(
+                        px + pt.x() * cos_r - pt.y() * sin_r,
+                        py + pt.x() * sin_r + pt.y() * cos_r,
+                    )
+
+                poly = QPolygonF([_rot(apex), _rot(bl), _rot(br)])
+                item = QGraphicsPolygonItem(poly)
+                item.setBrush(QBrush(QColor(255, 255, 255)))
+                item.setPen(QPen(QColor(220, 0, 0), 1.5))
+                item.setZValue(Z_OSM_LAYER + 1)
+                item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+                item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+                item.setAcceptHoverEvents(False)
+                item.setData(0, 'osm_sign')
+                item.setData(1, tags)
+                path_items.append(item)
+                continue
+
+            r = 3.0
+            item = QGraphicsEllipseItem(px - r, py - r, 2 * r, 2 * r)
+
+            if hw == 'traffic_signals' or 'traffic_signals' in tags:
+                color = QColor(0, 200, 0)      # Green  — traffic light
+            elif hw == 'stop':
+                color = QColor(220, 0, 0)      # Red    — stop sign
+            elif hw == 'crossing':
+                color = QColor(0, 180, 255)    # Blue   — pedestrian crossing
+            elif hw == 'street_lamp':
+                color = QColor(255, 230, 100)  # Light yellow — lamp
+            elif hw in ('bus_stop', 'turning_circle'):
+                color = QColor(180, 0, 220)    # Purple — bus stop / turning circle
+            elif 'maxspeed' in tags:
+                color = QColor(255, 255, 255)  # White  — speed limit
+            elif 'traffic_sign' in tags:
+                color = QColor(255, 200, 0)    # Amber  — generic traffic sign
+            elif 'natural' in tags:
+                color = QColor(0, 128, 0)      # Dark green — tree
+            else:
+                color = QColor(200, 200, 200)  # Grey   — other details
+
+
+            item.setBrush(QBrush(color))
+            item.setPen(QPen(Qt.GlobalColor.black, 0.5))
+            item.setZValue(Z_OSM_LAYER + 1)
+            item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+            item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+            item.setAcceptHoverEvents(False)
+            item.setData(0, 'osm_sign')
+            item.setData(1, tags)
+            path_items.append(item)
 
         if not path_items:
             self.lbl_osm_status.setText('No roads found')
@@ -2372,33 +2509,80 @@ class _OsmMixin:
             tree = ET.ElementTree(ET.fromstring(osm_content))
             root = tree.getroot()
             rect = self._scene_clip_rect()
+
+            # Identify nodes with "extra details" that should be preserved.
+            detail_tags = {
+                'traffic_sign',
+                'maxspeed',
+                'natural',  # for tree
+                'amenity',  # for parking
+                'barrier',  # for guard_rail (though usually ways)
+                'traffic_signals',
+            }
+            detail_highway_values = {
+                'traffic_signals',
+                'give_way',
+                'stop',
+                'crossing',
+                'street_lamp',
+                'bus_stop',
+                'turning_circle',
+            }
+
+            def _is_interesting_node(node_el: ET.Element) -> bool:
+                for tag in node_el.findall('tag'):
+                    k = tag.get('k', '')
+                    v = tag.get('v', '')
+                    if k in detail_tags:
+                        return True
+                    if k == 'highway' and v in detail_highway_values:
+                        return True
+                return False
+
+            original_nodes: dict[str, ET.Element] = {}
             node_scene: dict[str, tuple[float, float]] = {}
             for node in root.iter('node'):
                 try:
+                    nid = str(node.get('id', ''))
+                    original_nodes[nid] = node
                     lat = float(node.get('lat', '0'))
                     lon = float(node.get('lon', '0'))
                     sx, sy = self._osm_latlon_to_scene(lat, lon)  # type: ignore[misc]
-                    node_scene[str(node.get('id', ''))] = (float(sx), float(sy))
+                    node_scene[nid] = (float(sx), float(sy))
                 except Exception:
                     continue
 
-            used_nodes: dict[str, ET.Element] = {}
+            xmin, xmax, ymin, ymax = rect
+
+            def _is_in_bounds(sx: float, sy: float) -> bool:
+                return xmin <= sx <= xmax and ymin <= sy <= ymax
+
+            used_node_ids: set[str] = set()
             new_ways: list[ET.Element] = []
             next_node_id = -1
             next_way_id = -1
+
+            # Map from (lat, lon) string to new node element to avoid duplicates
+            generated_nodes: dict[str, ET.Element] = {}
+
             original_ways = list(root.findall('way'))
-            for node in root.findall('node'):
+
+            # Clear original elements to rebuild
+            for node in list(root.findall('node')):
                 root.remove(node)
             for way in list(root.findall('way')):
                 root.remove(way)
+
             for way in original_ways:
                 refs = [str(nd.get('ref', '')) for nd in way.findall('nd')]
                 points = [node_scene[r] for r in refs if r in node_scene]
                 if len(points) < 2:
                     continue
+
                 clipped_parts = self._clip_polyline_to_rect(points, rect)
                 if not clipped_parts:
                     continue
+
                 tags = [copy.deepcopy(tag) for tag in way.findall('tag')]
                 for idx, part in enumerate(clipped_parts):
                     if len(part) < 2:
@@ -2410,14 +2594,13 @@ class _OsmMixin:
                         new_way.set('id', str(next_way_id))
                         next_way_id -= 1
                     new_way.set('version', way.get('version', '1'))
-                    if way.get('visible') is not None:
-                        new_way.set('visible', way.get('visible', 'true'))
-                    else:
-                        new_way.set('visible', 'true')
+                    new_way.set('visible', way.get('visible', 'true'))
+
                     for sx, sy in part:
                         lat, lon = self._scene_to_latlon(float(sx), float(sy))
+                        # Use high precision for coordinate matching
                         key = f'{lat:.9f}:{lon:.9f}'
-                        node_el = used_nodes.get(key)
+                        node_el = generated_nodes.get(key)
                         if node_el is None:
                             node_el = ET.Element('node')
                             node_el.set('id', str(next_node_id))
@@ -2425,18 +2608,51 @@ class _OsmMixin:
                             node_el.set('version', '1')
                             node_el.set('lat', f'{lat:.9f}')
                             node_el.set('lon', f'{lon:.9f}')
-                            used_nodes[key] = node_el
+
+                            # Check if this coordinate matches an original interesting node
+                            # This is slightly simplified: if multiple nodes match, we pick one.
+                            for nid, (osx, osy) in node_scene.items():
+                                if math.isclose(osx, sx, abs_tol=1e-6) and math.isclose(osy, sy, abs_tol=1e-6):
+                                    orig_node = original_nodes[nid]
+                                    if _is_interesting_node(orig_node):
+                                        for otag in orig_node.findall('tag'):
+                                            node_el.append(copy.deepcopy(otag))
+                                        used_node_ids.add(nid)
+                                    break
+
+                            generated_nodes[key] = node_el
                             next_node_id -= 1
+
                         nd = ET.SubElement(new_way, 'nd')
                         nd.set('ref', node_el.get('id', ''))
+
                     for tag in tags:
                         new_way.append(copy.deepcopy(tag))
                     new_ways.append(new_way)
 
-            for node in used_nodes.values():
-                root.append(node)
-            for way in new_ways:
-                root.append(way)
+            # Preserve standalone interesting nodes that are within bounds
+            for nid, node in original_nodes.items():
+                if nid in used_node_ids:
+                    continue
+                if not _is_interesting_node(node):
+                    continue
+                osx, osy = node_scene.get(nid, (float('nan'), float('nan')))
+                if not _is_in_bounds(osx, osy):
+                    continue
+
+                # Add this standalone node
+                new_node = copy.deepcopy(node)
+                # Keep original ID for standalone nodes if possible, or use next_node_id
+                # Actually, using original ID is safer for standalone nodes as long as it doesn't collide
+                # with our generated negative IDs.
+                root.append(new_node)
+
+            # Add generated nodes and ways
+            for node_el in generated_nodes.values():
+                root.append(node_el)
+            for way_el in new_ways:
+                root.append(way_el)
+
             buf = io.StringIO()
             tree.write(buf, encoding='unicode', xml_declaration=True)
             return buf.getvalue()

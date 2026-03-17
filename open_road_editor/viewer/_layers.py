@@ -903,6 +903,8 @@ class _LayersMixin:
                 self._carla_bev_bounds_rect_item.setPos(dx_s, dy_s)
             if self._xodr_bounds_rect_item:
                 self._xodr_bounds_rect_item.setPos(dx_s, dy_s)
+            if self._osm_bounds_rect_item:
+                self._osm_bounds_rect_item.setPos(dx_s, dy_s)
             return
 
         self._flush_tile_resize(old_offset, old_w, old_h)
@@ -1398,11 +1400,7 @@ class _LayersMixin:
         # OSM layer constraints and visibility
         has_osm = self.osm_path is not None
         self.grp_osm_opts.setVisible(has_osm)
-        if hasattr(self, 'btn_world_update_osm'):
-            self.btn_world_update_osm.setVisible(has_osm)
-        if hasattr(self, 'btn_fit_osm'):
-            self.btn_fit_osm.setVisible(has_osm)
-            self.btn_fit_osm.setEnabled(has_osm)
+
         if hasattr(self, 'btn_fit_carla'):
             self.btn_fit_carla.setEnabled(self.check_carla_bev.isChecked())
         self._update_xodr_export_btn()

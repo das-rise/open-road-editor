@@ -550,10 +550,7 @@ class _ShortcutsMixin:
         world_edit_enabled = bool(
             hasattr(self, 'btn_world_edit_mode') and self.btn_world_edit_mode.isChecked()
         )
-        if hasattr(self, 'btn_world_update_osm'):
-            self.btn_world_update_osm.setEnabled(
-                world_edit_enabled and hasattr(self, 'check_osm') and self.check_osm.isChecked()
-            )
+
         if hasattr(self, 'btn_world_update_xodr'):
             self.btn_world_update_xodr.setEnabled(
                 world_edit_enabled

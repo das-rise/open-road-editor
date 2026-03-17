@@ -37,6 +37,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Create the virtual environment and install dependencies
 uv sync
+source .venv/bin/activate
 ```
 
 ### 2B. Install with pip

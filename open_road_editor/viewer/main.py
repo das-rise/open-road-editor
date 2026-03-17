@@ -522,21 +522,24 @@ class OpenDriveViewer(
         update_bounds_row = QHBoxLayout()
         update_bounds_row.setSpacing(6)
         update_bounds_row.addWidget(QLabel('Update with'))
-        self.btn_world_update_osm = QPushButton('OSM')
-        self.btn_world_update_osm.setToolTip(
-            'Update world origin and bounds to match the loaded OSM file'
-        )
-        self.btn_world_update_osm.clicked.connect(self.fit_world_extent_to_osm)
-        update_bounds_row.addWidget(self.btn_world_update_osm)
+
         self.btn_world_update_xodr = QPushButton('OpenDRIVE')
         self.btn_world_update_xodr.setToolTip(
             'Update world origin and bounds to match the loaded OpenDRIVE file'
+        )
+        self.btn_world_update_xodr.setStyleSheet(
+            'QPushButton { border: 2px solid rgb(0, 120, 255); border-radius: 3px; padding: 2px 6px; }'
+            ' QPushButton:hover { background-color: rgba(0, 120, 255, 40); }'
         )
         self.btn_world_update_xodr.clicked.connect(self.fit_world_extent_to_xodr)
         update_bounds_row.addWidget(self.btn_world_update_xodr)
         self.btn_world_update_carla = QPushButton('CARLA')
         self.btn_world_update_carla.setToolTip(
             'Update world origin and bounds to match the CARLA server'
+        )
+        self.btn_world_update_carla.setStyleSheet(
+            'QPushButton { border: 2px solid rgb(255, 140, 0); border-radius: 3px; padding: 2px 6px; }'
+            ' QPushButton:hover { background-color: rgba(255, 140, 0, 40); }'
         )
         self.btn_world_update_carla.clicked.connect(self.fit_world_extent_to_carla)
         update_bounds_row.addWidget(self.btn_world_update_carla)
@@ -912,16 +915,21 @@ class OpenDriveViewer(
         fit_row = QHBoxLayout()
         fit_row.setSpacing(6)
         fit_row.addWidget(QLabel('Fit to'))
-        self.btn_fit_osm = QPushButton('OSM')
-        self.btn_fit_osm.setToolTip('Fit view to the loaded OSM bounds')
-        self.btn_fit_osm.clicked.connect(self.fit_view_to_osm)
-        fit_row.addWidget(self.btn_fit_osm)
+
         self.btn_fit_xodr = QPushButton('OpenDRIVE')
         self.btn_fit_xodr.setToolTip('Fit view to the loaded OpenDRIVE bounds')
+        self.btn_fit_xodr.setStyleSheet(
+            'QPushButton { border: 2px solid rgb(0, 120, 255); border-radius: 3px; padding: 2px 6px; }'
+            ' QPushButton:hover { background-color: rgba(0, 120, 255, 40); }'
+        )
         self.btn_fit_xodr.clicked.connect(self.fit_view_to_xodr)
         fit_row.addWidget(self.btn_fit_xodr)
         self.btn_fit_carla = QPushButton('CARLA')
         self.btn_fit_carla.setToolTip('Fit view to CARLA server bounds')
+        self.btn_fit_carla.setStyleSheet(
+            'QPushButton { border: 2px solid rgb(255, 140, 0); border-radius: 3px; padding: 2px 6px; }'
+            ' QPushButton:hover { background-color: rgba(255, 140, 0, 40); }'
+        )
         self.btn_fit_carla.clicked.connect(self.fit_view_to_carla)
         fit_row.addWidget(self.btn_fit_carla)
         fit_row.addStretch()
