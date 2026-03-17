@@ -1,0 +1,9 @@
+#!/bin/sh
+# Update README to point to submodule READMEs at exact commit, then stage it.
+PYTHON=${PYTHON:-python3}
+$PYTHON scripts/update_readme_links.py || exit 1
+# If README changed, stage it so the commit includes the update.
+if ! git diff --quiet -- README.md; then
+  git add README.md
+fi
+exit 0

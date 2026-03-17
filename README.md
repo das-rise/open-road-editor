@@ -1,13 +1,13 @@
 # OpenRoadEditor
 
-An OSM and OpenDRIVE road-network editor built on top of [ORBIT](open_road_editor/external/ORBIT/README.md) and PyQt6.
+An OSM and OpenDRIVE road-network editor built on top of [ORBIT](https://github.com/RI-SE/ORBIT/blob/18285361336dd23a81487a4adee388d506d16b78/README.md) and PyQt6.
 
 ## Features
 
 - **OpenDRIVE visualisation** — load and display `.xodr` files with full lane polygon rendering using the built-in vector renderer backed by ORBIT.
 - **Live XODR refresh** — edits to the OSM layer automatically trigger a re-conversion via `netconvert` and update the OpenDRIVE overlay in real time.
 - **OSM overlay** — fetch, display, and edit OpenStreetMap way/node data; stitch or split roads; export changes to a local OSM file.
-- **OSM → OpenDRIVE conversion** — drive `netconvert` (SUMO) via [osm-to-xodr](open_road_editor/external/osm-to-xodr/README.md) from within the UI to convert an OSM file to `.xodr`.
+- **OSM → OpenDRIVE conversion** — drive `netconvert` (SUMO) via [osm-to-xodr](https://github.com/das-rise/osm-to-xodr/blob/349a31f479653056c5301d66a7c94c4a9b9e50d7/README.md) from within the UI to convert an OSM file to `.xodr`.
 - **CARLA OSM tile server** — connect to a running [WayWiser CARLA](https://github.com/das-rise/WayWiseR/tree/humble/waywiser_carla) OSM tile server to stream map tiles into the editor.
 - **Imagery layers** — ESRI tile imagery and CARLA bird's-eye-view (BEV) tile server, with independent zoom/opacity controls.
 - **Project persistence** — save and reload the full editor state (layers, edits, view position) as a `.ore` project file.
