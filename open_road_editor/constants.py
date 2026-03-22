@@ -189,8 +189,15 @@ OSM2XODR_SCHEMA: list = [
             ('import_crossings', 'bool', 'true'),
             ('import_turn_lanes', 'bool', 'true'),
             ('import_bike_access', 'bool', 'true'),
+            ('import_netconvert_signs', 'bool', 'false'),
             ('remove_geometry', 'bool', 'true'),
             ('no_turnarounds', 'bool', 'true'),
+        ],
+    ),
+    (
+        'signals',
+        [
+            ('country', 'str', 'SE'),
         ],
     ),
     ('report', [('aggregate_warnings', 'int', '5')]),
@@ -205,14 +212,11 @@ KEYBOARD_SHORTCUT_DEFAULTS: dict = {
     'file_open': 'Ctrl+O',
     'file_save': 'Ctrl+S',
     'file_save_as': 'Ctrl+Shift+S',
-    'xodr_toggle_edit_mode': 'Ctrl+E',
-    'xodr_export': 'Ctrl+Alt+E',
-    'xodr_update_width': 'Ctrl+Shift+W',
-    'xodr_delete_segment': 'Del',
     'osm_undo': 'Ctrl+Z',
     'osm_redo_primary': 'Ctrl+Shift+Z',
     'osm_redo_secondary': 'Ctrl+Y',
-    'refresh_opendrive_from_osm': 'Ctrl+Alt+R',
+    'osm_delete_segment': 'Delete',
+    'refresh_all_layers': 'Ctrl+R',
 }
 
 KEYBOARD_SHORTCUT_LABELS: list = [
@@ -220,14 +224,11 @@ KEYBOARD_SHORTCUT_LABELS: list = [
     ('file_open', 'File: Open Project'),
     ('file_save', 'File: Save Project'),
     ('file_save_as', 'File: Save Project As'),
-    ('xodr_toggle_edit_mode', 'OpenDRIVE: Toggle Edit Mode'),
-    ('xodr_export', 'OpenDRIVE: Export XODR'),
-    ('xodr_update_width', 'OpenDRIVE: Update Width'),
-    ('xodr_delete_segment', 'OpenDRIVE: Delete Selected Segment'),
     ('osm_undo', 'OSM: Undo'),
     ('osm_redo_primary', 'OSM: Redo (Primary)'),
     ('osm_redo_secondary', 'OSM: Redo (Secondary)'),
-    ('refresh_opendrive_from_osm', 'OSM: Refresh OpenDRIVE'),
+    ('osm_delete_segment', 'OSM: Delete Selected Segment'),
+    ('refresh_all_layers', 'Refresh All Layers'),
 ]
 
 MOUSE_BINDING_DEFAULTS: dict = {

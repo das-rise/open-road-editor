@@ -26,11 +26,27 @@ from open_road_editor.constants import *  # noqa: F401,F403
 class _ProjectMixin:
     """Mixin — see viewer/main.py for the assembled class."""
 
+    def _window_title_name(self) -> str:
+        project_path = str(getattr(self, 'project_file_path', '') or '').strip()
+        if project_path:
+            return os.path.splitext(os.path.basename(project_path))[0]
+        town_name = str(getattr(self, 'town_name', '') or '').strip()
+        if town_name and town_name != 'Untitled':
+            return town_name
+        return ''
+
+    def _refresh_window_title(self) -> None:
+        title_name = self._window_title_name()
+        self.setWindowTitle(f'OpenRoadEditor - {title_name}' if title_name else 'OpenRoadEditor')
+
     def _collect_persistent_settings(self) -> dict:
         state = {
             'show_esri': self.check_esri.isChecked(),
             'show_carla_bev': self.check_carla_bev.isChecked(),
             'show_opendrive': self.check_opendrive.isChecked(),
+            'show_opendrive_objects': self.check_opendrive_objects.isChecked()
+            if hasattr(self, 'check_opendrive_objects')
+            else True,
             'world_edit_mode': self.btn_world_edit_mode.isChecked()
             if hasattr(self, 'btn_world_edit_mode')
             else False,
@@ -58,12 +74,16 @@ class _ProjectMixin:
             'grid_font_size': self.spin_font.value(),
             'grid_sig_digits': self.spin_grid_sigdigits.value(),
             'show_osm': self.check_osm.isChecked(),
+            'show_osm_objects': self.check_osm_objects.isChecked()
+            if hasattr(self, 'check_osm_objects')
+            else True,
             'osm_edit_mode': self.btn_osm_edit_mode.isChecked()
             if hasattr(self, 'btn_osm_edit_mode')
             else False,
             'osm_alpha': self.spin_osm_alpha.value(),
             'osm2xodr_settings': copy.deepcopy(self._osm2xodr_settings),
             'osm_props_height': self._osm_props_scroll.height(),
+            'osm_node_props_height': self._osm_node_props_scroll.height(),
             'osm_props_key_col_width': int(
                 getattr(self, '_osm_tag_key_col_width', TAG_KEY_FIELD_WIDTH)
             ),
@@ -95,6 +115,8 @@ class _ProjectMixin:
                 self.check_carla_bev.setChecked(bool(state.get('show_carla_bev')))
             if 'show_opendrive' in state:
                 self.check_opendrive.setChecked(bool(state.get('show_opendrive')))
+            if 'show_opendrive_objects' in state and hasattr(self, 'check_opendrive_objects'):
+                self.check_opendrive_objects.setChecked(bool(state.get('show_opendrive_objects')))
             if 'world_edit_mode' in state and hasattr(self, 'btn_world_edit_mode'):
                 self.btn_world_edit_mode.setChecked(bool(state.get('world_edit_mode')))
             if 'esri_edit_mode' in state and hasattr(self, 'btn_esri_edit_mode'):
@@ -103,6 +125,8 @@ class _ProjectMixin:
                 self.btn_carla_edit_mode.setChecked(bool(state.get('carla_edit_mode')))
             if 'show_osm' in state:
                 self.check_osm.setChecked(bool(state.get('show_osm')))
+            if 'show_osm_objects' in state and hasattr(self, 'check_osm_objects'):
+                self.check_osm_objects.setChecked(bool(state.get('show_osm_objects')))
             if 'osm_edit_mode' in state and hasattr(self, 'btn_osm_edit_mode'):
                 self.btn_osm_edit_mode.setChecked(bool(state.get('osm_edit_mode')))
             if 'osm_alpha' in state:
@@ -114,6 +138,9 @@ class _ProjectMixin:
             if 'osm_props_height' in state:
                 _h = int(state.get('osm_props_height', self._osm_props_default_height))
                 self._set_osm_props_height(_h)
+            if 'osm_node_props_height' in state:
+                _node_h = int(state.get('osm_node_props_height', self._osm_props_default_height))
+                self._set_osm_node_props_height(_node_h)
             if 'osm_props_key_col_width' in state:
                 self._osm_tag_key_col_width = max(60, int(state.get('osm_props_key_col_width')))
 
@@ -226,6 +253,7 @@ class _ProjectMixin:
                 'xodr_content': xodr_content,
                 'osm_content': osm_content,
                 'segment_info_height': int(self._osm_props_scroll.height()),
+                'node_info_height': int(self._osm_node_props_scroll.height()),
                 'segment_info_key_col_width': int(
                     getattr(self, '_osm_tag_key_col_width', TAG_KEY_FIELD_WIDTH)
                 ),
@@ -279,86 +307,99 @@ class _ProjectMixin:
         try:
             self.edit_xodr.setText('')
             self.edit_osm.setText(osm_path)
+
+            # For OSM-backed projects, regenerate temporary XODR on load
+            # (do not rely on persisted XODR content/path).
+            if osm_path and os.path.isfile(osm_path):
+                generated_xodr = self._convert_osm_to_xodr(osm_path)
+                if generated_xodr:
+                    xodr_path = generated_xodr
+                    self._suppress_next_xodr_title_update = True
+                    self.edit_xodr.setText(generated_xodr)
+            elif xodr_path and os.path.isfile(xodr_path):
+                self._suppress_next_xodr_title_update = True
+                self.edit_xodr.setText(xodr_path)
+
+            # Restore all saved visibility settings AFTER path-change triggers are done.
+            # This ensures path-change handlers don't override the user's saved visibility.
+            self._suppress_async_layer_pipeline = True
+            try:
+                if 'show_opendrive' in settings_state:
+                    self.check_opendrive.setChecked(bool(settings_state.get('show_opendrive')))
+                if 'show_opendrive_objects' in settings_state and hasattr(
+                    self, 'check_opendrive_objects'
+                ):
+                    self.check_opendrive_objects.setChecked(
+                        bool(settings_state.get('show_opendrive_objects'))
+                    )
+                if 'show_osm' in settings_state:
+                    self.check_osm.setChecked(bool(settings_state.get('show_osm')))
+                if 'show_osm_objects' in settings_state and hasattr(self, 'check_osm_objects'):
+                    self.check_osm_objects.setChecked(bool(settings_state.get('show_osm_objects')))
+            finally:
+                self._suppress_async_layer_pipeline = False
+
+            if project_town_name:
+                self.town_name = project_town_name
+
+            project_seg_h = project.get('segment_info_height')
+            if project_seg_h is not None:
+                self._set_osm_props_height(int(project_seg_h))
+            project_node_h = project.get('node_info_height')
+            if project_node_h is not None:
+                self._set_osm_node_props_height(int(project_node_h))
+            project_key_w = project.get('segment_info_key_col_width')
+            if project_key_w is not None:
+                self._osm_tag_key_col_width = max(60, int(project_key_w))
+
+            zoom_pct = int(project.get('display_zoom_pct', settings_state.get('zoom_pct', 100)))
+            self._pending_project_zoom_pct = max(100, zoom_pct)
+            cx = project.get('viewport_center_x')
+            cy = project.get('viewport_center_y')
+            self._pending_project_viewport_center = (
+                (float(cx), float(cy)) if cx is not None and cy is not None else None
+            )
+
+            carla_meta = project.get('carla_metadata', {})
+            server_meta = carla_meta.get('server_meta') if isinstance(carla_meta, dict) else None
+            if isinstance(server_meta, dict):
+                self._carla_bev_server_meta = server_meta
+                bounds = carla_meta.get('server_bounds')
+                if isinstance(bounds, (list, tuple)) and len(bounds) == 4:
+                    self._carla_bev_server_bounds = tuple(int(v) for v in bounds)
+                else:
+                    self._carla_bev_server_bounds = self._carla_bev_compute_server_tile_bounds(
+                        server_meta, self.spin_tile_zoom.value()
+                    )
+                self._carla_bev_draw_bounds_rect(server_meta)
+                if self._carla_bev_bounds_rect_item is not None:
+                    self._carla_bev_bounds_rect_item.setVisible(self.check_carla_bev.isChecked())
+            else:
+                self._carla_bev_server_meta = None
+                self._carla_bev_server_bounds = None
+                if self._carla_bev_bounds_rect_item is not None:
+                    self.scene.removeItem(self._carla_bev_bounds_rect_item)
+                    self._carla_bev_bounds_rect_item = None
+
+            self.project_file_path = project_path
+            self._preferred_project_save_dir = os.path.dirname(project_path) or None
+            self._refresh_window_title()
+            self._reset_osm_dirty()
+
+            # Show the right layer rows based on which paths the project contains
+            has_xodr = bool(xodr_path)
+            has_osm = bool(osm_path)
+            self._arrange_import_layers(
+                show_xodr=has_xodr,
+                show_osm=has_osm,
+                osm_first=has_osm,
+            )
+
+            self.update_visibility()
+            # Restore saved viewport (zoom/center) immediately.
+            self._apply_load_view()
         finally:
             self._restoring_project_payload = False
-
-        # For OSM-backed projects, regenerate temporary XODR on load
-        # (do not rely on persisted XODR content/path).
-        if osm_path and os.path.isfile(osm_path):
-            generated_xodr = self._convert_osm_to_xodr(osm_path)
-            if generated_xodr:
-                xodr_path = generated_xodr
-                self._suppress_next_xodr_title_update = True
-                self.edit_xodr.setText(generated_xodr)
-                self.check_opendrive.setChecked(True)
-
-        if project_town_name:
-            self.town_name = project_town_name
-            self.setWindowTitle(f'OpenRoadEditor - {self.town_name}')
-
-        project_seg_h = project.get('segment_info_height')
-        if project_seg_h is not None:
-            self._set_osm_props_height(int(project_seg_h))
-        project_key_w = project.get('segment_info_key_col_width')
-        if project_key_w is not None:
-            self._osm_tag_key_col_width = max(60, int(project_key_w))
-
-        zoom_pct = int(project.get('display_zoom_pct', settings_state.get('zoom_pct', 100)))
-        self._pending_project_zoom_pct = max(100, zoom_pct)
-        cx = project.get('viewport_center_x')
-        cy = project.get('viewport_center_y')
-        self._pending_project_viewport_center = (
-            (float(cx), float(cy)) if cx is not None and cy is not None else None
-        )
-        if not xodr_path and self._pending_project_zoom_pct is not None:
-            QTimer.singleShot(
-                0,
-                lambda z=self._pending_project_zoom_pct: self.spin_zoom.setValue(z),
-            )
-            if self._pending_project_viewport_center:
-                c = self._pending_project_viewport_center
-                QTimer.singleShot(
-                    CENTER_ON_DELAY_MS, lambda: self.view.centerOn(QPointF(c[0], c[1]))
-                )
-            self._pending_project_zoom_pct = None
-            self._pending_project_viewport_center = None
-
-        carla_meta = project.get('carla_metadata', {})
-        server_meta = carla_meta.get('server_meta') if isinstance(carla_meta, dict) else None
-        if isinstance(server_meta, dict):
-            self._carla_bev_server_meta = server_meta
-            bounds = carla_meta.get('server_bounds')
-            if isinstance(bounds, (list, tuple)) and len(bounds) == 4:
-                self._carla_bev_server_bounds = tuple(int(v) for v in bounds)
-            else:
-                self._carla_bev_server_bounds = self._carla_bev_compute_server_tile_bounds(
-                    server_meta, self.spin_tile_zoom.value()
-                )
-            self._carla_bev_draw_bounds_rect(server_meta)
-            if self._carla_bev_bounds_rect_item is not None:
-                self._carla_bev_bounds_rect_item.setVisible(self.check_carla_bev.isChecked())
-        else:
-            self._carla_bev_server_meta = None
-            self._carla_bev_server_bounds = None
-            if self._carla_bev_bounds_rect_item is not None:
-                self.scene.removeItem(self._carla_bev_bounds_rect_item)
-                self._carla_bev_bounds_rect_item = None
-
-        self.project_file_path = project_path
-        self._preferred_project_save_dir = os.path.dirname(project_path) or None
-        self._reset_osm_dirty()
-
-        # Show the right layer rows based on which paths the project contains
-        has_xodr = bool(xodr_path)
-        has_osm = bool(osm_path)
-        if has_osm:
-            # OSM project: show both layers, OSM first. Always show XODR row (disabled if empty).
-            self._arrange_import_layers(show_xodr=True, show_osm=True, osm_first=True)
-        else:
-            # No map files: hide both
-            self._arrange_import_layers(show_xodr=False, show_osm=False)
-
-        self.update_visibility()
 
     def new_project(self):
         has_unsaved_changes = bool(self._osm_dirty)
@@ -396,7 +437,7 @@ class _ProjectMixin:
             self._pending_project_view_scale = None
             self._pending_project_world_center = None
             self.town_name = 'Untitled'
-            self.setWindowTitle('OpenRoadEditor')
+            self._refresh_window_title()
 
             # ── Stop any in-flight tile fetches ───────────────────────────
             if self._esri_loading or self._esri_pix_data is not None:
@@ -517,6 +558,7 @@ class _ProjectMixin:
                 self.btn_osm_edit_mode.setChecked(False)
             self._osm2xodr_settings = copy.deepcopy(DEFAULT_OSM2XODR_SETTINGS)
             self._set_osm_props_height(self._osm_props_max_h)
+            self._set_osm_node_props_height(self._osm_props_max_h)
 
             # ── ESRI options ──────────────────────────────────────────────
             self.spin_tile_zoom.setValue(DEFAULT_TILE_ZOOM)
@@ -646,6 +688,7 @@ class _ProjectMixin:
                 handle.write('\n')
             self.project_file_path = file_path
             self._preferred_project_save_dir = os.path.dirname(file_path) or None
+            self._refresh_window_title()
             self._reset_osm_dirty()
             self._show_project_status(f'Saved project: {os.path.basename(file_path)}')
             return True

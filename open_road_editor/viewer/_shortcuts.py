@@ -24,9 +24,11 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QStyle,
     QStyleOptionGroupBox,
+    QTextEdit,
     QVBoxLayout,
 )
 
@@ -138,12 +140,10 @@ class _ShortcutsMixin:
         self.sc_redo1.activated.connect(self._redo_active_edit)
         self.sc_redo2 = QShortcut(self)
         self.sc_redo2.activated.connect(self._redo_active_edit)
-        self.sc_refresh_opendrive_from_osm = QShortcut(self)
-        self.sc_refresh_opendrive_from_osm.activated.connect(self._refresh_opendrive_from_osm)
-        self.sc_xodr_export = QShortcut(self)
-        self.sc_xodr_export.activated.connect(self._shortcut_export_xodr)
         self.sc_delete_segment = QShortcut(self)
         self.sc_delete_segment.activated.connect(self._delete_active_segment)
+        self.sc_refresh_all_layers = QShortcut(self)
+        self.sc_refresh_all_layers.activated.connect(self.refresh_all_layers)
         self._apply_keyboard_shortcuts()
 
     def _set_shortcut_for_action(self, action: QAction, seq_text: str):
@@ -163,12 +163,9 @@ class _ShortcutsMixin:
         self._set_shortcut_for_shortcut(self.sc_undo, m.get('osm_undo', ''))
         self._set_shortcut_for_shortcut(self.sc_redo1, m.get('osm_redo_primary', ''))
         self._set_shortcut_for_shortcut(self.sc_redo2, m.get('osm_redo_secondary', ''))
+        self._set_shortcut_for_shortcut(self.sc_delete_segment, m.get('osm_delete_segment', ''))
         self._set_shortcut_for_shortcut(
-            self.sc_refresh_opendrive_from_osm, m.get('refresh_opendrive_from_osm', '')
-        )
-        self._set_shortcut_for_shortcut(self.sc_xodr_export, m.get('xodr_export', ''))
-        self._set_shortcut_for_shortcut(
-            self.sc_delete_segment, m.get('xodr_delete_segment', 'Del')
+            self.sc_refresh_all_layers, m.get('refresh_all_layers', '')
         )
 
     def _shortcut_export_xodr(self) -> None:
@@ -206,7 +203,17 @@ class _ShortcutsMixin:
     def _delete_active_segment(self) -> None:
         # Do not hijack Del while typing in an editor widget.
         focused = QApplication.focusWidget()
-        if isinstance(focused, (QLineEdit, QKeySequenceEdit, QAbstractSpinBox, QComboBox)):
+        if isinstance(
+            focused,
+            (
+                QLineEdit,
+                QKeySequenceEdit,
+                QAbstractSpinBox,
+                QComboBox,
+                QTextEdit,
+                QPlainTextEdit,
+            ),
+        ):
             return
         self._delete_selected_osm_segment()
 
@@ -223,6 +230,20 @@ class _ShortcutsMixin:
             editors[key] = editor
             form.addRow(f'{label}:', editor)
         layout.addLayout(form)
+
+        roundabout_info = QLabel(
+            'Roundabout move: select a roundabout in OSM edit mode, then use '
+            'Ctrl+Arrow keys to move it. Hold Shift for a larger step.'
+        )
+        roundabout_info.setWordWrap(True)
+        layout.addWidget(roundabout_info)
+
+        node_move_info = QLabel(
+            'Control nodes: in OSM edit mode, select a segment and Ctrl+drag a control node '
+            'circle to move it.'
+        )
+        node_move_info.setWordWrap(True)
+        layout.addWidget(node_move_info)
 
         mouse_group = QGroupBox('Mouse + Keyboard Bindings (Right-click)')
         mouse_layout = QFormLayout(mouse_group)
@@ -318,9 +339,13 @@ class _ShortcutsMixin:
                 self.edit_osm.setText(path)  # triggers on_osm_path_changed
                 self.check_osm.setChecked(True)
                 # OSM import: show both layers, OSM first
-                self._arrange_import_layers(show_xodr=True, show_osm=True, osm_first=True)
+                self._arrange_import_layers(
+                    show_xodr=True, show_osm=True, osm_first=True, reset_objects=True
+                )
 
-    def _arrange_import_layers(self, show_xodr: bool, show_osm: bool, osm_first: bool = False):
+    def _arrange_import_layers(
+        self, show_xodr: bool, show_osm: bool, osm_first: bool = False, reset_objects: bool = False
+    ):
         """Show/hide and reorder the OpenDRIVE and OSM layer rows."""
         # Remove both from the layout (doesn't destroy them)
         self._layers_layout.removeWidget(self._opendrive_layer_widget)
@@ -334,6 +359,11 @@ class _ShortcutsMixin:
             self._layers_layout.insertWidget(1, self._osm_layer_widget)
         self._opendrive_layer_widget.setVisible(show_xodr)
         self._osm_layer_widget.setVisible(show_osm)
+        if reset_objects:
+            if hasattr(self, 'check_opendrive_objects'):
+                self.check_opendrive_objects.setChecked(True)
+            if hasattr(self, 'check_osm_objects'):
+                self.check_osm_objects.setChecked(True)
 
     def _start_project_status_fade(self):
         self._project_status_fade_anim.stop()
@@ -370,16 +400,17 @@ class _ShortcutsMixin:
         if not checked:
             self._osm_relation_pick_mode = None
             self._osm_tags_edit_mode = False
+            self._osm_node_tags_edit_mode = False
             self._osm_relation_edit_mode['preceding'] = False
             self._osm_relation_edit_mode['succeeding'] = False
             self._osm_relation_draft['preceding'] = None
             self._osm_relation_draft['succeeding'] = None
-            self._remove_osm_node_dots()
         sel = self._osm_selected_item
         if sel is not None:
             self._osm_show_props(sel)
-            if checked:
-                self._show_osm_node_dots(sel)
+            self._show_osm_node_dots(sel)
+            if not checked:
+                self._show_selected_osm_node_props()
         self._show_project_status('OSM edit mode enabled' if checked else 'OSM edit mode disabled')
 
     def _on_osm_props_edit_mode_toggled(self, checked: bool) -> None:
@@ -414,6 +445,34 @@ class _ShortcutsMixin:
         self._osm_tags_edit_mode = True
         self._osm_show_props(sel)
 
+    def _on_osm_node_props_edit_mode_toggled(self, checked: bool) -> None:
+        if not hasattr(self, 'btn_osm_node_props_edit_mode'):
+            return
+        self._set_mode_toggle_visual(self.btn_osm_node_props_edit_mode, checked)
+        self.btn_osm_node_props_edit_mode.setToolTip(
+            'Node properties edit mode enabled' if checked else 'Node properties read-only'
+        )
+        self._position_osm_node_props_edit_mode_button()
+        if not checked:
+            self._osm_node_tags_edit_mode = False
+            try:
+                if hasattr(self, '_commit_selected_osm_node_tag_edits'):
+                    self._commit_selected_osm_node_tag_edits()
+            except Exception:
+                pass
+            self._show_selected_osm_node_props()
+            return
+        if not self._osm_edit_enabled():
+            self._show_project_status('Enable OSM Edit mode first')
+            self.btn_osm_node_props_edit_mode.setChecked(False)
+            return
+        if not self._osm_selected_node_id():
+            self._show_project_status('Select an OSM node first')
+            self.btn_osm_node_props_edit_mode.setChecked(False)
+            return
+        self._osm_node_tags_edit_mode = True
+        self._show_selected_osm_node_props()
+
     def _position_osm_edit_mode_button(self) -> None:
         if not hasattr(self, 'grp_osm_opts') or not hasattr(self, 'btn_osm_edit_mode'):
             return
@@ -443,6 +502,25 @@ class _ShortcutsMixin:
             self._osm_props_group,
         )
         btn = self.btn_osm_props_edit_mode
+        x = title_rect.right() + 6
+        y = title_rect.center().y() - (btn.height() // 2)
+        btn.move(x, y)
+        btn.raise_()
+
+    def _position_osm_node_props_edit_mode_button(self) -> None:
+        if not hasattr(self, '_osm_node_props_group') or not hasattr(
+            self, 'btn_osm_node_props_edit_mode'
+        ):
+            return
+        option = QStyleOptionGroupBox()
+        self._osm_node_props_group.initStyleOption(option)
+        title_rect = self._osm_node_props_group.style().subControlRect(
+            QStyle.ComplexControl.CC_GroupBox,
+            option,
+            QStyle.SubControl.SC_GroupBoxLabel,
+            self._osm_node_props_group,
+        )
+        btn = self.btn_osm_node_props_edit_mode
         x = title_rect.right() + 6
         y = title_rect.center().y() - (btn.height() // 2)
         btn.move(x, y)
@@ -616,3 +694,9 @@ class _ShortcutsMixin:
         h = max(self._osm_props_min_h, min(self._osm_props_max_h, h))
         self._osm_props_scroll.setMinimumHeight(h)
         self._osm_props_scroll.setMaximumHeight(h)
+
+    def _set_osm_node_props_height(self, height: int) -> None:
+        h = int(height)
+        h = max(self._osm_props_min_h, min(self._osm_props_max_h, h))
+        self._osm_node_props_scroll.setMinimumHeight(h)
+        self._osm_node_props_scroll.setMaximumHeight(h)

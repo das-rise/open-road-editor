@@ -8,9 +8,6 @@ from PyQt6.QtGui import QPainterPath  # noqa: F401
 from PyQt6.QtWidgets import QGraphicsPathItem
 
 from open_road_editor.constants import (
-    OSM_ALWAYS_NODE_FILL_COLOR,
-    OSM_ALWAYS_NODE_OUTLINE_COLOR,
-    OSM_ALWAYS_NODE_RADIUS_PX,
     OSM_DIRECTION_ARROW_COLOR,
     OSM_DIRECTION_ARROW_LENGTH_PX,
     OSM_DIRECTION_ARROW_WIDTH_PX,
@@ -25,16 +22,15 @@ class OSMWayPathItem(QGraphicsPathItem):
         super().__init__(path or QPainterPath(), parent)
         self._way_scene_coords: list[tuple[float, float]] = []
         self._show_direction_arrows = True
-        self._show_nodes = True
-        self._direction_mode = "forward"  # 'forward' | 'reverse' | 'both'
+        self._direction_mode = 'forward'  # 'forward' | 'reverse' | 'both'
 
     def set_way_scene_coords(self, coords: list) -> None:
         self._way_scene_coords = [(float(x), float(y)) for x, y in coords]
         self.update()
 
     def set_direction_mode(self, mode: str) -> None:
-        if mode not in ("forward", "reverse", "both"):
-            mode = "forward"
+        if mode not in ('forward', 'reverse', 'both'):
+            mode = 'forward'
         self._direction_mode = mode
         self.update()
 
@@ -73,9 +69,7 @@ class OSMWayPathItem(QGraphicsPathItem):
                 def _draw_arrow(dir_sign: float, normal_sign: float) -> None:
                     cx = mx + nx * off * normal_sign
                     cy = my + ny * off * normal_sign
-                    tip = QPointF(
-                        cx + ux * half_len * dir_sign, cy + uy * half_len * dir_sign
-                    )
+                    tip = QPointF(cx + ux * half_len * dir_sign, cy + uy * half_len * dir_sign)
                     left = QPointF(
                         cx - ux * half_len * dir_sign + nx * half_w,
                         cy - uy * half_len * dir_sign + ny * half_w,
@@ -86,20 +80,11 @@ class OSMWayPathItem(QGraphicsPathItem):
                     )
                     painter.drawPolygon(QPolygonF([tip, left, right]))
 
-                if self._direction_mode == "both":
+                if self._direction_mode == 'both':
                     _draw_arrow(1.0, 1.0)
                     _draw_arrow(-1.0, -1.0)
-                elif self._direction_mode == "reverse":
+                elif self._direction_mode == 'reverse':
                     _draw_arrow(-1.0, 0.0)
                 else:
                     _draw_arrow(1.0, 0.0)
-            painter.restore()
-
-        if self._show_nodes:
-            r = OSM_ALWAYS_NODE_RADIUS_PX / scale
-            painter.save()
-            painter.setPen(QPen(OSM_ALWAYS_NODE_OUTLINE_COLOR, max(0.8 / scale, 0.0)))
-            painter.setBrush(QBrush(OSM_ALWAYS_NODE_FILL_COLOR))
-            for x, y in coords:
-                painter.drawEllipse(QPointF(x, y), r, r)
             painter.restore()

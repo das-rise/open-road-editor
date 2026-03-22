@@ -42,6 +42,22 @@ from open_road_editor.utils.coords import _tmerc_forward_wgs84, _tmerc_inverse_w
 from open_road_editor.widgets import OSMWayPathItem
 
 
+_OSM_SIGN_HEADING_OFFSET_TAG = 'direction'
+_OSM_NODE_SIGN_HIGHWAY_VALUES = {
+    'traffic_signals',
+    'give_way',
+    'stop',
+    'crossing',
+    'street_lamp',
+    'bus_stop',
+}
+_OSM_NODE_SIGN_TAG_KEYS = {
+    'traffic_sign',
+    'traffic_signals',
+    'maxspeed',
+}
+
+
 class _OsmMixin:
     """Mixin — see viewer/main.py for the assembled class."""
 
@@ -53,6 +69,8 @@ class _OsmMixin:
         if new_path != self.osm_path:
             self.osm_path = new_path
             self._osm_content = None
+            if not self._restoring_project_payload:
+                self._suppress_auto_fit = False
             if self.osm_path:
                 try:
                     with open(self.osm_path, 'r', encoding='utf-8') as f:
@@ -61,21 +79,24 @@ class _OsmMixin:
                     print(f'Failed to read OSM content: {e}')
                 if not self._restoring_project_payload:
                     self.town_name = os.path.splitext(os.path.basename(self.osm_path))[0]
-                    self.setWindowTitle(f'OpenRoadEditor - {self.town_name}')
+                    self._refresh_window_title()
                     self._mark_osm_dirty_after_load = True
                     generated_xodr = self._convert_osm_to_xodr(self.osm_path)
                     if generated_xodr:
                         self._suppress_next_xodr_title_update = True
                         self.edit_xodr.setText(generated_xodr)
                         self.check_opendrive.setChecked(True)
-                        self._arrange_import_layers(show_xodr=True, show_osm=True, osm_first=True)
+                        self._arrange_import_layers(
+                            show_xodr=True, show_osm=True, osm_first=True, reset_objects=True
+                        )
                 else:
                     self._mark_osm_dirty_after_load = False
 
             self._clear_osm_items()
             if self.osm_path:
                 if not self.check_osm.isChecked():
-                    self.check_osm.setChecked(True)  # triggers refresh via update_visibility
+                    if not self._restoring_project_payload:
+                        self.check_osm.setChecked(True)  # triggers refresh via update_visibility
                 else:
                     self.refresh_osm()
             else:
@@ -204,8 +225,18 @@ class _OsmMixin:
                     bearing_by_nid[ref] = angle_deg  # last encountered way wins
 
         # Attach bearing (or None) as 5th element to each sign
-        signs = [(lat, lon, stags, nid, bearing_by_nid.get(nid))
-                 for lat, lon, stags, nid in signs]
+        signs = [
+            (
+                lat,
+                lon,
+                stags,
+                nid,
+                (bearing_by_nid.get(nid) + _OsmMixin._osm_sign_heading_offset_deg(stags))
+                if bearing_by_nid.get(nid) is not None
+                else None,
+            )
+            for lat, lon, stags, nid in signs
+        ]
         return ways, signs, tree
 
     def _on_osm_ways_ready(self, result) -> None:
@@ -215,8 +246,10 @@ class _OsmMixin:
         mark_dirty_after_load = self._mark_osm_dirty_after_load
         self._mark_osm_dirty_after_load = False
 
-        if isinstance(result, tuple) and len(result) == 3:
-            ways, signs, tree = result
+        if isinstance(result, tuple) and len(result) >= 3:
+            ways, signs, tree = result[:3]
+            if len(result) >= 4 and result[3] is not None:
+                self._osm_content = str(result[3])
         else:
             ways, signs, tree = result if result else [], [], None
 
@@ -228,9 +261,15 @@ class _OsmMixin:
 
         self._osm_original_tree = tree
         self._osm_edits.clear()
+        self._osm_node_tag_edits.clear()
         self._osm_created_ways.clear()
         self._osm_deleted_way_ids.clear()
-        self._reset_osm_dirty()
+
+        # Only reset the dirty flag if this is a fresh project/OSM load.
+        # For a refresh (mark_dirty_after_load is False), keep the dirty flag
+        # if it was already set (meaning there were pending edits).
+        if mark_dirty_after_load or not self._osm_dirty:
+            self._reset_osm_dirty()
         max_way_id = 0
         max_node_id = 0
         for _highway, _coords, _tags, way_id, node_refs in ways:
@@ -309,19 +348,19 @@ class _OsmMixin:
             hw = tags.get('highway', '')
             if hw == 'give_way':
                 # Yield sign: equilateral triangle, white fill, red border.
-                # The triangle apex points *against* the direction of travel
-                # (toward oncoming traffic), which is the standard orientation.
+                # The triangle apex points *down* (inverted), which is the conventional shape.
+                # By default, it faces against the direction of travel (oncoming traffic).
                 s = 6.0  # half-width of the base
                 h = s * math.sqrt(3)  # height of equilateral triangle
 
-                # Build triangle in local coords centred on origin, apex pointing up (north)
-                apex   = QPointF(0.0,  -h * 2 / 3)
-                bl     = QPointF(-s,    h / 3)
-                br     = QPointF( s,    h / 3)
+                # Build inverted triangle in local coords (apex pointing down/south)
+                apex = QPointF(0.0, h * 2 / 3)
+                tl = QPointF(-s, -h / 3)
+                tr = QPointF(s, -h / 3)
 
-                # Rotate each point by the road bearing so apex faces oncoming traffic.
-                # bearing is the direction the road *travels* (prev→cur), so we
-                # want the apex pointing back along that direction (bearing + 180).
+                # Rotate each point by the road bearing.
+                # Since apex is down (South), a bearing of 0 (North) keeps it pointing South
+                # (facing the driver arriving at the junction).
                 rot_deg = bearing if bearing is not None else 0.0
                 rot_rad = math.radians(rot_deg)
                 cos_r, sin_r = math.cos(rot_rad), math.sin(rot_rad)
@@ -332,7 +371,7 @@ class _OsmMixin:
                         py + pt.x() * sin_r + pt.y() * cos_r,
                     )
 
-                poly = QPolygonF([_rot(apex), _rot(bl), _rot(br)])
+                poly = QPolygonF([_rot(apex), _rot(tl), _rot(tr)])
                 item = QGraphicsPolygonItem(poly)
                 item.setBrush(QBrush(QColor(255, 255, 255)))
                 item.setPen(QPen(QColor(220, 0, 0), 1.5))
@@ -342,6 +381,9 @@ class _OsmMixin:
                 item.setAcceptHoverEvents(False)
                 item.setData(0, 'osm_sign')
                 item.setData(1, tags)
+                item.setData(2, str(nid))
+                item.setData(3, QPen(item.pen()))
+                self._osm_sign_item_positions[item] = (px, py)
                 path_items.append(item)
                 continue
 
@@ -349,24 +391,23 @@ class _OsmMixin:
             item = QGraphicsEllipseItem(px - r, py - r, 2 * r, 2 * r)
 
             if hw == 'traffic_signals' or 'traffic_signals' in tags:
-                color = QColor(0, 200, 0)      # Green  — traffic light
+                color = QColor(0, 200, 0)  # Green  — traffic light
             elif hw == 'stop':
-                color = QColor(220, 0, 0)      # Red    — stop sign
+                color = QColor(220, 0, 0)  # Red    — stop sign
             elif hw == 'crossing':
-                color = QColor(0, 180, 255)    # Blue   — pedestrian crossing
+                color = QColor(0, 180, 255)  # Blue   — pedestrian crossing
             elif hw == 'street_lamp':
                 color = QColor(255, 230, 100)  # Light yellow — lamp
             elif hw in ('bus_stop', 'turning_circle'):
-                color = QColor(180, 0, 220)    # Purple — bus stop / turning circle
+                color = QColor(180, 0, 220)  # Purple — bus stop / turning circle
             elif 'maxspeed' in tags:
                 color = QColor(255, 255, 255)  # White  — speed limit
             elif 'traffic_sign' in tags:
-                color = QColor(255, 200, 0)    # Amber  — generic traffic sign
+                color = QColor(255, 200, 0)  # Amber  — generic traffic sign
             elif 'natural' in tags:
-                color = QColor(0, 128, 0)      # Dark green — tree
+                color = QColor(0, 128, 0)  # Dark green — tree
             else:
                 color = QColor(200, 200, 200)  # Grey   — other details
-
 
             item.setBrush(QBrush(color))
             item.setPen(QPen(Qt.GlobalColor.black, 0.5))
@@ -376,6 +417,9 @@ class _OsmMixin:
             item.setAcceptHoverEvents(False)
             item.setData(0, 'osm_sign')
             item.setData(1, tags)
+            item.setData(2, str(nid))
+            item.setData(3, QPen(item.pen()))
+            self._osm_sign_item_positions[item] = (px, py)
             path_items.append(item)
 
         if not path_items:
@@ -398,6 +442,10 @@ class _OsmMixin:
         self._remove_osm_selected_direction_arrows()
         self._osm_hover_item = None
         self._osm_selected_item = None
+        self._osm_sign_item_positions.clear()
+        self._osm_selected_sign_item = None
+        self._osm_selected_sign_node_id = None
+        self._osm_selected_node_index = None
         self._osm_dragging_dot = None
         self._osm_dragging_way_item = None
         self._osm_way_drag_last_scene = None
@@ -408,11 +456,13 @@ class _OsmMixin:
         self._osm_item_meta.clear()
         self._osm_way_connectivity.clear()
         self._osm_edits.clear()
+        self._osm_node_tag_edits.clear()
         self._osm_created_ways.clear()
         self._osm_deleted_way_ids.clear()
         self._osm_relation_edit_mode = {'preceding': False, 'succeeding': False}
         self._osm_relation_draft = {'preceding': None, 'succeeding': None}
         self._osm_tags_edit_mode = False
+        self._osm_node_tags_edit_mode = False
         self._osm_relation_hover_map = {}
         self._osm_relation_pick_mode = None
         self._osm_suppress_next_click_select = False
@@ -424,6 +474,9 @@ class _OsmMixin:
         self._osm_next_node_id = 1
         self._osm_next_way_id = 1
         self._osm_original_tree = None
+        if hasattr(self, '_osm_node_props_group'):
+            self._osm_node_props_group.setVisible(False)
+        self._update_osm_reverse_sign_button()
         self._update_osm_export_btn()
         if self._osm_bounds_rect_item is not None:
             self.scene.removeItem(self._osm_bounds_rect_item)
@@ -441,11 +494,16 @@ class _OsmMixin:
         op = self.spin_osm_alpha.value() if opacity is None else float(opacity)
         vis = self.check_osm.isChecked() if visible is None else bool(visible)
         render_visible = vis and op > 0.0
+        show_objects = getattr(self, 'check_osm_objects', None)
+        show_objects_checked = show_objects.isChecked() if show_objects is not None else True
         if self._osm_vector_group is not None:
             self._osm_vector_group.setVisible(render_visible)
             self._osm_vector_group.setOpacity(op)
             for _item in self._osm_vector_group.childItems():
-                _item.setVisible(render_visible)
+                if _item.data(0) == 'osm_sign':
+                    _item.setVisible(render_visible and show_objects_checked)
+                else:
+                    _item.setVisible(render_visible)
         if self._osm_bounds_rect_item is not None:
             self._osm_bounds_rect_item.setVisible(render_visible)
 
@@ -496,6 +554,24 @@ class _OsmMixin:
         self._osm_props_group.setVisible(True)
         tags = meta[1]
         self._populate_osm_tag_editor(tags, item)
+
+    def _show_selected_osm_node_props(self) -> None:
+        if not hasattr(self, '_osm_node_props_group'):
+            return
+        node_id = self._osm_selected_node_id()
+        if hasattr(self, 'btn_osm_node_props_edit_mode'):
+            want_checked = bool(self._osm_node_tags_edit_mode)
+            if self.btn_osm_node_props_edit_mode.isChecked() != want_checked:
+                blocked = self.btn_osm_node_props_edit_mode.blockSignals(True)
+                self.btn_osm_node_props_edit_mode.setChecked(want_checked)
+                self.btn_osm_node_props_edit_mode.blockSignals(blocked)
+            self._set_mode_toggle_visual(self.btn_osm_node_props_edit_mode, want_checked)
+            self._position_osm_node_props_edit_mode_button()
+        if not node_id:
+            self._osm_node_props_group.setVisible(False)
+            return
+        self._osm_node_props_group.setVisible(True)
+        self._populate_osm_node_tag_editor(node_id, self._osm_current_node_tags(node_id))
 
     def _clear_osm_multi_selection(self) -> None:
         items = list(getattr(self, '_osm_multi_selected_items', set()) or [])
@@ -563,11 +639,24 @@ class _OsmMixin:
         self._osm_dragging_way_item = None
         self._osm_way_drag_last_scene = None
         self._osm_way_drag_had_motion = False
+        # Clear any sign-node selection when a segment is being selected/deselected
+        if self._osm_selected_sign_item is not None:
+            orig_pen = self._osm_selected_sign_item.data(3)
+            if orig_pen is not None:
+                self._osm_selected_sign_item.setPen(orig_pen)
+            self._osm_selected_sign_item = None
+            self._osm_selected_sign_node_id = None
         prev = self._osm_selected_item
+        if prev is not item:
+            self._osm_selected_node_index = None
+            self._osm_selected_dot = None
         if prev is not item:
             if prev is not None and self._osm_tags_edit_mode:
                 self._on_osm_tag_edited(prev)
                 self._osm_tags_edit_mode = False
+            if self._osm_node_tags_edit_mode:
+                self._commit_selected_osm_node_tag_edits()
+                self._osm_node_tags_edit_mode = False
             if prev is not None:
                 for rel in ('preceding', 'succeeding'):
                     if bool(self._osm_relation_edit_mode.get(rel, False)):
@@ -584,6 +673,9 @@ class _OsmMixin:
         self._osm_selected_item = item
         if item is None:
             self._osm_props_group.setVisible(False)
+            if hasattr(self, '_osm_node_props_group'):
+                self._osm_node_props_group.setVisible(False)
+            self._update_osm_reverse_sign_button()
             return
         self._osm_highlight_item(item, OSM_SELECTION_COLOR)
         self._osm_show_props(item)
@@ -1151,29 +1243,394 @@ class _OsmMixin:
 
     # ── Node dot markers ──────────────────────────────────────────────
 
-    def _show_osm_node_dots(self, item) -> None:
-        """Place draggable dot markers on each node of the selected OSM segment."""
-        self._remove_osm_node_dots()
+    def _apply_osm_node_dot_style(self, dot, selected: bool) -> None:
+        """Update node-dot styling for selected vs unselected state."""
+        if selected:
+            dot.setPen(QPen(OSM_SELECTION_COLOR, OSM_NODE_DOT_OUTLINE_WIDTH + 0.8))
+            dot.setBrush(QBrush(QColor(255, 235, 80, 240)))
+        else:
+            dot.setPen(QPen(OSM_NODE_DOT_OUTLINE_COLOR, OSM_NODE_DOT_OUTLINE_WIDTH))
+            dot.setBrush(QBrush(OSM_NODE_DOT_FILL_COLOR))
+
+    def _set_osm_selected_node_index(self, node_index: int | None, dot=None) -> None:
+        """Select a node on the current segment, with or without a visible edit dot."""
+        prev_node_id = self._osm_selected_node_id()
+        item = self._osm_selected_item
+        meta = self._osm_item_meta.get(item) if item is not None else None
+        if meta is None or node_index is None or not (0 <= int(node_index) < len(meta[6])):
+            self._osm_selected_node_index = None
+            self._osm_selected_dot = None
+        else:
+            self._osm_selected_node_index = int(node_index)
+            if dot in self._osm_dot_to_index and self._osm_dot_to_index.get(dot) == int(
+                node_index
+            ):
+                self._osm_selected_dot = dot
+            else:
+                self._osm_selected_dot = None
+                for existing_dot, existing_idx in self._osm_dot_to_index.items():
+                    if existing_idx == int(node_index):
+                        self._osm_selected_dot = existing_dot
+                        break
+        new_node_id = self._osm_selected_node_id()
+        if self._osm_node_tags_edit_mode and prev_node_id and prev_node_id != new_node_id:
+            self._on_osm_node_tag_edited(prev_node_id)
+        for existing_dot in self._osm_node_dots:
+            self._apply_osm_node_dot_style(existing_dot, existing_dot is self._osm_selected_dot)
+        self._update_osm_reverse_sign_button()
+        self._show_selected_osm_node_props()
+
+    def _set_osm_selected_dot(self, dot) -> None:
+        """Select a node dot on the current segment and restyle markers."""
+        node_index = self._osm_dot_to_index.get(dot) if dot in self._osm_dot_to_index else None
+        self._set_osm_selected_node_index(node_index, dot=dot)
+
+    @staticmethod
+    def _osm_sign_heading_offset_deg(tags: dict) -> float:
+        if tags is None:
+            return 0.0
+        # Check standard tags first
+        val = tags.get(_OSM_SIGN_HEADING_OFFSET_TAG) or tags.get('traffic_sign:direction')
+
+        # Handle standard OSM relative directions for signs on ways
+        if isinstance(val, str):
+            v_lower = val.strip().lower()
+            if v_lower == 'forward':
+                return 0.0
+            if v_lower == 'backward':
+                return 180.0
+
+        try:
+            return float(str(val).strip() or '0')
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _osm_selected_node_id(self) -> str | None:
+        item = self._osm_selected_item
+        node_index = self._osm_selected_node_index
+        if item is not None and node_index is not None:
+            meta = self._osm_item_meta.get(item)
+            if meta:
+                idx = int(node_index)
+                if 0 <= idx < len(meta[6]):
+                    return str(meta[6][idx][0])
+        # Fall back to selected sign node (locked-mode node selection)
+        return getattr(self, '_osm_selected_sign_node_id', None)
+
+    def _osm_original_node_tags(self, node_id: str | None) -> dict:
+        nid = str(node_id or '')
+        if not nid:
+            return {}
+        tree = self._osm_original_tree
+        if tree is None:
+            return {}
+        node_el = tree.getroot().find(f"node[@id='{nid}']")
+        if node_el is None:
+            return {}
+        tags = {}
+        for tag_el in node_el.findall('tag'):
+            k = tag_el.get('k', '')
+            v = tag_el.get('v', '')
+            if k:
+                tags[k] = v
+        return tags
+
+    def _osm_current_node_tags(self, node_id: str | None) -> dict:
+        nid = str(node_id or '')
+        if not nid:
+            return {}
+        if nid in self._osm_node_tag_edits:
+            return dict(self._osm_node_tag_edits[nid])
+        return self._osm_original_node_tags(nid)
+
+    def _set_osm_node_tags(self, node_id: str | None, tags: dict) -> bool:
+        nid = str(node_id or '').strip()
+        if not nid:
+            return False
+        normalized = {}
+        for key, value in dict(tags or {}).items():
+            key_s = str(key or '').strip()
+            if not key_s:
+                continue
+            normalized[key_s] = str(value or '').strip()
+        original = self._osm_original_node_tags(nid)
+        if normalized == original:
+            self._osm_node_tag_edits.pop(nid, None)
+        else:
+            self._osm_node_tag_edits[nid] = normalized
+        composed_osm = self._compose_current_osm_content()
+        if composed_osm is not None:
+            self._osm_content = composed_osm
+        self._mark_osm_dirty()
+        self._update_osm_export_btn()
+        self._update_osm_reverse_sign_button()
+        try:
+            if hasattr(self, '_schedule_auto_xodr_refresh'):
+                self._schedule_auto_xodr_refresh()
+        except Exception:
+            pass
+        return True
+
+    @staticmethod
+    def _osm_node_has_sign(tags: dict) -> bool:
+        hw = str((tags or {}).get('highway', '')).strip().lower()
+        if hw in _OSM_NODE_SIGN_HIGHWAY_VALUES:
+            return True
+        return bool((tags or {}).get('traffic_sign') or (tags or {}).get('maxspeed'))
+
+    def _update_osm_reverse_sign_button(self) -> None:
+        if not hasattr(self, 'btn_reverse_osm_sign'):
+            return
+        node_id = self._osm_selected_node_id()
+        tags = self._osm_current_node_tags(node_id)
+        should_show = bool(node_id and self._osm_node_has_sign(tags))
+        self.btn_reverse_osm_sign.setVisible(should_show)
+        self.btn_reverse_osm_sign.setEnabled(should_show)
+
+    def _reverse_selected_osm_sign(self) -> None:
+        node_id = self._osm_selected_node_id()
+        if not node_id:
+            return
+        tags = self._osm_current_node_tags(node_id)
+        if not self._osm_node_has_sign(tags):
+            return
+
+        new_tags = dict(tags)
+        # Determine if we should use forward/backward strings or numeric degrees.
+        # We prefer strings if the current value is a string or if it's a cardinal 0/180 flip.
+        current_val = tags.get(_OSM_SIGN_HEADING_OFFSET_TAG) or tags.get('traffic_sign:direction')
+        use_strings = isinstance(current_val, str) and current_val.strip().lower() in (
+            'forward',
+            'backward',
+        )
+
+        current_offset = self._osm_sign_heading_offset_deg(tags)
+        new_offset = (current_offset + 180.0) % 360.0
+
+        # When reversing, always use the new standard tag and clear alternatives
+        new_tags.pop('traffic_sign:direction', None)
+
+        if (
+            use_strings
+            or math.isclose(new_offset, 0.0, abs_tol=1e-6)
+            or math.isclose(new_offset, 180.0, abs_tol=1e-6)
+        ):
+            if math.isclose(new_offset, 0.0, abs_tol=1e-6):
+                new_tags[_OSM_SIGN_HEADING_OFFSET_TAG] = 'forward'
+            else:
+                new_tags[_OSM_SIGN_HEADING_OFFSET_TAG] = 'backward'
+        else:
+            if math.isclose(new_offset, round(new_offset), abs_tol=1e-6):
+                new_tags[_OSM_SIGN_HEADING_OFFSET_TAG] = str(int(round(new_offset)))
+            else:
+                new_tags[_OSM_SIGN_HEADING_OFFSET_TAG] = f'{new_offset:.6f}'
+
+        self._set_osm_node_tags(node_id, new_tags)
+        self._show_selected_osm_node_props()
+        self._update_osm_reverse_sign_button()
+        self._show_project_status(f'Sign {node_id} reversed by 180 degrees')
+        self.refresh_all_layers()
+
+    def _commit_selected_osm_node_tag_edits(self) -> None:
+        node_id = self._osm_selected_node_id()
+        if node_id:
+            self._on_osm_node_tag_edited(node_id)
+
+    def _populate_osm_node_tag_editor(self, node_id: str, tags: dict) -> None:
+        container = self._osm_node_tag_editor_widget
+        layout = container.layout()
+        if layout is not None:
+            while layout.count():
+                child = layout.takeAt(0)
+                w = child.widget()
+                if w:
+                    w.deleteLater()
+        else:
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
+
+        self._osm_node_tag_rows = []
+        props_editing = bool(self._osm_edit_enabled() and self._osm_node_tags_edit_mode)
+
+        def _add_row(key: str, value: str, *, deletable: bool) -> None:
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.setSpacing(2)
+            key_edit = QLineEdit(key)
+            key_edit.setFixedHeight(TAG_ROW_HEIGHT)
+            key_edit.setMinimumWidth(60)
+            key_edit.setPlaceholderText('key')
+            key_edit.setReadOnly(not props_editing or not deletable)
+            val_edit = QLineEdit(value)
+            val_edit.setFixedHeight(TAG_ROW_HEIGHT)
+            val_edit.setMinimumWidth(80)
+            val_edit.setPlaceholderText('value')
+            val_edit.setReadOnly(not props_editing or not deletable)
+            row.addWidget(key_edit, 1)
+            row.addWidget(val_edit, 1)
+            del_btn = QPushButton('✕')
+            del_btn.setFixedWidth(TAG_ROW_HEIGHT)
+            del_btn.setFixedHeight(TAG_ROW_HEIGHT)
+            del_btn.setToolTip('Remove tag')
+            del_btn.setVisible(props_editing and deletable)
+            row.addWidget(del_btn)
+            row_widget = QWidget()
+            row_widget.setContentsMargins(0, 0, 0, 0)
+            row_widget.setLayout(row)
+            layout.addWidget(row_widget)
+            self._osm_node_tag_rows.append((row_widget, key_edit, val_edit))
+            if props_editing and deletable:
+                key_edit.editingFinished.connect(
+                    lambda _nid=node_id: self._on_osm_node_tag_edited(_nid)
+                )
+                val_edit.editingFinished.connect(
+                    lambda _nid=node_id: self._on_osm_node_tag_edited(_nid)
+                )
+                del_btn.clicked.connect(
+                    lambda _checked=False, _row=row_widget, _nid=node_id: (
+                        self._on_osm_node_tag_delete(_row, _nid)
+                    )
+                )
+
+        _add_row('id', str(node_id), deletable=False)
+        for key, value in tags.items():
+            if str(key) == 'id':
+                continue
+            _add_row(str(key), str(value), deletable=True)
+
+        add_btn = QPushButton('+ Add tag')
+        add_btn.setFixedHeight(TAG_ROW_HEIGHT)
+        add_btn.setVisible(props_editing)
+        add_btn.clicked.connect(
+            lambda _checked=False, _nid=node_id: self._on_osm_node_tag_add(_nid)
+        )
+        layout.addWidget(add_btn)
+        layout.addStretch()
+
+        has_sign = self._osm_node_has_sign(tags)
+        if hasattr(self, 'btn_osm_node_add_sign'):
+            self.btn_osm_node_add_sign.setVisible(props_editing)
+            self.btn_osm_node_add_sign.setEnabled(props_editing and not has_sign)
+        if hasattr(self, 'btn_osm_node_remove_sign'):
+            self.btn_osm_node_remove_sign.setVisible(props_editing)
+            self.btn_osm_node_remove_sign.setEnabled(props_editing and has_sign)
+
+    def _on_osm_node_tag_edited(self, node_id: str | None) -> None:
         if not self._osm_edit_enabled():
             return
+        new_tags = {}
+        for _row_widget, key_edit, val_edit in self._osm_node_tag_rows:
+            key = key_edit.text().strip()
+            value = val_edit.text().strip()
+            if key and key != 'id':
+                new_tags[key] = value
+        if self._set_osm_node_tags(node_id, new_tags):
+            self._show_selected_osm_node_props()
+
+    def _on_osm_node_tag_delete(self, row_widget, node_id: str | None) -> None:
+        if not self._osm_edit_enabled():
+            return
+        row_widget.deleteLater()
+        self._osm_node_tag_rows = [
+            row for row in self._osm_node_tag_rows if row[0] is not row_widget
+        ]
+        self._on_osm_node_tag_edited(node_id)
+
+    def _on_osm_node_tag_add(self, node_id: str | None) -> None:
+        if not self._osm_edit_enabled():
+            return
+        tags = self._osm_current_node_tags(node_id)
+        suffix = 1
+        blank_key = ''
+        while blank_key in tags:
+            suffix += 1
+            blank_key = f'new_tag_{suffix}'
+        tags[blank_key] = ''
+        self._populate_osm_node_tag_editor(str(node_id or ''), tags)
+
+    def _add_sign_info_to_selected_osm_node(self) -> None:
+        if not self._osm_edit_enabled():
+            self._show_project_status('Enable OSM Edit mode first')
+            return
+        node_id = self._osm_selected_node_id()
+        if not node_id:
+            self._show_project_status('Select an OSM node first')
+            return
+        tags = self._osm_current_node_tags(node_id)
+        if self._osm_node_has_sign(tags):
+            self._show_project_status(f'Node {node_id} already has sign information')
+            return
+        new_tags = dict(tags)
+        new_tags['traffic_sign'] = str(new_tags.get('traffic_sign') or 'unknown')
+        self._set_osm_node_tags(node_id, new_tags)
+        self._show_selected_osm_node_props()
+        self._show_project_status(f'Added sign information to node {node_id}')
+
+    def _remove_sign_info_from_selected_osm_node(self) -> None:
+        if not self._osm_edit_enabled():
+            self._show_project_status('Enable OSM Edit mode first')
+            return
+        node_id = self._osm_selected_node_id()
+        if not node_id:
+            self._show_project_status('Select an OSM node first')
+            return
+        tags = self._osm_current_node_tags(node_id)
+        if not self._osm_node_has_sign(tags):
+            self._show_project_status(f'Node {node_id} has no sign information to remove')
+            return
+        new_tags = dict(tags)
+        for key in _OSM_NODE_SIGN_TAG_KEYS:
+            new_tags.pop(key, None)
+        if str(new_tags.get('highway', '')).strip().lower() in _OSM_NODE_SIGN_HIGHWAY_VALUES:
+            new_tags.pop('highway', None)
+        new_tags.pop(_OSM_SIGN_HEADING_OFFSET_TAG, None)
+        new_tags.pop('traffic_sign:direction', None)
+        self._set_osm_node_tags(node_id, new_tags)
+        self._show_selected_osm_node_props()
+        self._show_project_status(f'Removed sign information from node {node_id}')
+
+    def _show_osm_node_dots(self, item) -> None:
+        """Place draggable dot markers on each node of the selected OSM segment."""
+        selected_index = self._osm_selected_node_index if item is self._osm_selected_item else None
+        self._remove_osm_node_dots()
         meta = self._osm_item_meta.get(item)
         if not meta:
             return
         scene_coords = meta[3]
         r = self._OSM_NODE_DOT_RADIUS
+        edit_enabled = self._osm_edit_enabled()
         for idx, (sx, sy) in enumerate(scene_coords):
             dot = QGraphicsEllipseItem(-r, -r, 2 * r, 2 * r)
             dot.setPos(sx, sy)
-            dot.setPen(QPen(OSM_NODE_DOT_OUTLINE_COLOR, OSM_NODE_DOT_OUTLINE_WIDTH))
-            dot.setBrush(QBrush(OSM_NODE_DOT_FILL_COLOR))
             dot.setZValue(Z_OSM_NODE_DOTS)  # above everything
             dot.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
-            dot.setCursor(QCursor(Qt.CursorShape.CrossCursor))
+            dot.setCursor(
+                QCursor(
+                    Qt.CursorShape.CrossCursor
+                    if edit_enabled
+                    else Qt.CursorShape.PointingHandCursor
+                )
+            )
+            dot.setAcceptedMouseButtons(
+                Qt.MouseButton.LeftButton if edit_enabled else Qt.MouseButton.NoButton
+            )
             # Mark as cosmetic so it doesn't scale with zoom
             dot.setFlags(dot.flags() | QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
             self.scene.addItem(dot)
             self._osm_node_dots.append(dot)
             self._osm_dot_to_index[dot] = idx
+            self._apply_osm_node_dot_style(dot, False)
+
+        if selected_index is None:
+            self._set_osm_selected_node_index(None)
+            return
+        selected_dot = None
+        for dot, idx in self._osm_dot_to_index.items():
+            if idx == selected_index:
+                selected_dot = dot
+                break
+        self._set_osm_selected_node_index(selected_index, dot=selected_dot)
 
     def _show_osm_selected_direction_arrows(self, item) -> None:
         self._remove_osm_selected_direction_arrows()
@@ -1240,7 +1697,37 @@ class _OsmMixin:
             self.scene.removeItem(dot)
         self._osm_node_dots.clear()
         self._osm_dot_to_index.clear()
+        self._osm_selected_dot = None
         self._osm_dragging_dot = None
+        if hasattr(self, '_osm_node_props_group'):
+            self._osm_node_props_group.setVisible(False)
+        self._update_osm_reverse_sign_button()
+
+    def _osm_selected_item_node_index_at(self, scene_pos, max_pick_px: float = 14.0):
+        """Return the nearest node index on the selected segment within tolerance."""
+        item = self._osm_selected_item
+        if item is None:
+            return None
+        meta = self._osm_item_meta.get(item)
+        if not meta:
+            return None
+        coords = meta[3]
+        if not coords:
+            return None
+        px = float(scene_pos.x())
+        py = float(scene_pos.y())
+        tolerance = self._osm_pick_tolerance_scene(max_pick_px)
+        tolerance_sq = tolerance * tolerance
+        best_index = None
+        best_dist_sq = tolerance_sq
+        for idx, (sx, sy) in enumerate(coords):
+            dx = px - float(sx)
+            dy = py - float(sy)
+            dist_sq = dx * dx + dy * dy
+            if dist_sq <= best_dist_sq:
+                best_dist_sq = dist_sq
+                best_index = idx
+        return best_index
 
     def _rebuild_osm_path(self, item, rebuild_arrows: bool = True) -> None:
         """Rebuild the QPainterPath for an OSM item from its (possibly edited) scene coords."""
@@ -1405,6 +1892,85 @@ class _OsmMixin:
         lat, lon = _tmerc_inverse_wgs84(x_tm, y_tm, ref_lat, ref_lon, k0, x0, y0)
         return lat, lon
 
+    def _osm_pick_tolerance_scene(self, pixels: float = 10.0) -> float:
+        """Convert a viewport-pixel hit tolerance to scene units."""
+        scale = float(self.view.transform().m11() or 1.0)
+        return max(float(pixels) / max(scale, 1e-6), 1.0)
+
+    @staticmethod
+    def _point_to_segment_distance_sq(
+        px: float,
+        py: float,
+        ax: float,
+        ay: float,
+        bx: float,
+        by: float,
+    ) -> float:
+        """Return squared distance from point P to line segment AB."""
+        abx = bx - ax
+        aby = by - ay
+        apx = px - ax
+        apy = py - ay
+        ab_len_sq = abx * abx + aby * aby
+        if ab_len_sq <= 1e-12:
+            return apx * apx + apy * apy
+        t = max(0.0, min(1.0, (apx * abx + apy * aby) / ab_len_sq))
+        cx = ax + t * abx
+        cy = ay + t * aby
+        dx = px - cx
+        dy = py - cy
+        return dx * dx + dy * dy
+
+    def _osm_nearest_way_item_at(self, scene_pos, exclude_item=None, max_pick_px: float = 10.0):
+        """Return the nearest OSM way to scene_pos within a screen-space tolerance."""
+        if not self._osm_item_meta:
+            return None
+
+        px = float(scene_pos.x())
+        py = float(scene_pos.y())
+        tolerance = self._osm_pick_tolerance_scene(max_pick_px)
+        tolerance_sq = tolerance * tolerance
+        best_item = None
+        best_dist_sq = tolerance_sq
+
+        for item, meta in self._osm_item_meta.items():
+            if item is exclude_item:
+                continue
+
+            scene_coords = meta[3] if len(meta) > 3 else None
+            if not scene_coords:
+                continue
+
+            min_x = min(pt[0] for pt in scene_coords) - tolerance
+            max_x = max(pt[0] for pt in scene_coords) + tolerance
+            min_y = min(pt[1] for pt in scene_coords) - tolerance
+            max_y = max(pt[1] for pt in scene_coords) + tolerance
+            if px < min_x or px > max_x or py < min_y or py > max_y:
+                continue
+
+            if len(scene_coords) == 1:
+                dx = px - float(scene_coords[0][0])
+                dy = py - float(scene_coords[0][1])
+                dist_sq = dx * dx + dy * dy
+            else:
+                dist_sq = min(
+                    self._point_to_segment_distance_sq(
+                        px,
+                        py,
+                        float(scene_coords[idx][0]),
+                        float(scene_coords[idx][1]),
+                        float(scene_coords[idx + 1][0]),
+                        float(scene_coords[idx + 1][1]),
+                    )
+                    for idx in range(len(scene_coords) - 1)
+                )
+
+            if dist_sq <= best_dist_sq:
+                best_dist_sq = dist_sq
+                best_item = item
+
+        return best_item
+
     # ── Hover ─────────────────────────────────────────────────────────
 
     def _update_osm_hover(self, scene_pos) -> None:
@@ -1417,11 +1983,7 @@ class _OsmMixin:
             return
         if not self._osm_item_meta:
             return
-        hit_item = None
-        for it in self.scene.items(scene_pos):
-            if it in self._osm_item_meta:
-                hit_item = it
-                break
+        hit_item = self._osm_nearest_way_item_at(scene_pos)
         if hit_item is self._osm_hover_item:
             return  # nothing changed
         # Restore previous hover item (but not if it is the selected item)
@@ -1449,17 +2011,81 @@ class _OsmMixin:
 
     # ── Click / selection ─────────────────────────────────────────────
 
+    def _osm_sign_node_at(self, scene_pos, max_pick_px: float = 14.0):
+        """Return the sign node item nearest to scene_pos within tolerance, or None."""
+        if not self._osm_sign_item_positions:
+            return None
+        tolerance = self._osm_pick_tolerance_scene(max_pick_px)
+        tolerance_sq = tolerance * tolerance
+        px = float(scene_pos.x())
+        py = float(scene_pos.y())
+        best_item = None
+        best_dist_sq = tolerance_sq
+        for item, (sx, sy) in self._osm_sign_item_positions.items():
+            if not item.isVisible():
+                continue
+            dx = px - sx
+            dy = py - sy
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < best_dist_sq:
+                best_dist_sq = dist_sq
+                best_item = item
+        return best_item
+
+    def _select_osm_sign_item(self, item) -> None:
+        """Select or deselect a sign node item, showing its tags read-only."""
+        prev = self._osm_selected_sign_item
+        if prev is not None and prev is not item:
+            orig_pen = prev.data(3)
+            if orig_pen is not None:
+                prev.setPen(orig_pen)
+        self._osm_selected_sign_item = item
+        if item is None:
+            self._osm_selected_sign_node_id = None
+            if hasattr(self, '_osm_node_props_group'):
+                self._osm_node_props_group.setVisible(False)
+            return
+        nid = item.data(2)
+        self._osm_selected_sign_node_id = str(nid) if nid is not None else None
+        highlight_pen = QPen(QColor(255, 165, 0))
+        highlight_pen.setWidthF(2.5)
+        highlight_pen.setCosmetic(True)
+        item.setPen(highlight_pen)
+        self._show_selected_osm_node_props()
+
     def _on_osm_click(self, scene_pos) -> None:
-        """Select / deselect an OSM road segment on click."""
+        """Select / deselect an OSM road segment or sign node on click."""
         if not self.check_osm.isChecked() or self.spin_osm_alpha.value() <= 0.0:
             return
+        if not self._osm_item_meta and not self._osm_sign_item_positions:
+            return
+
+        # Sign nodes take priority: check them before segments
+        sign_hit = self._osm_sign_node_at(scene_pos)
+        if sign_hit is not None:
+            if sign_hit is self._osm_selected_sign_item:
+                # Toggle off — deselect sign
+                self._select_osm_sign_item(None)
+                return
+            self._select_osm_item(None)  # deselect any segment
+            self._select_osm_sign_item(sign_hit)
+            return
+
+        # No sign hit — clear any sign selection and handle way segments
+        if self._osm_selected_sign_item is not None:
+            self._select_osm_sign_item(None)
+
+        node_hit_index = self._osm_selected_item_node_index_at(scene_pos)
+        if node_hit_index is not None:
+            if self._osm_selected_node_index == node_hit_index:
+                self._set_osm_selected_node_index(None)
+            else:
+                self._set_osm_selected_node_index(node_hit_index)
+            return
+
         if not self._osm_item_meta:
             return
-        hit_item = None
-        for it in self.scene.items(scene_pos):
-            if it in self._osm_item_meta:
-                hit_item = it
-                break
+        hit_item = self._osm_nearest_way_item_at(scene_pos)
         prev = self._osm_selected_item
         if hit_item is prev:
             # Toggle off — deselect
@@ -1478,18 +2104,22 @@ class _OsmMixin:
 
     def _osm_way_item_at(self, scene_pos, exclude_item=None):
         """Return OSM way item under scene_pos, optionally excluding one item."""
-        for it in self.scene.items(scene_pos):
-            if it in self._osm_item_meta and it is not exclude_item:
-                return it
-        return None
+        return self._osm_nearest_way_item_at(scene_pos, exclude_item=exclude_item)
 
-    def _on_osm_node_press(self, scene_pos) -> bool:
-        """Start dragging if a node dot is under the cursor.  Returns True if consumed."""
+    def _on_osm_node_press(self, scene_pos, ctrl_pressed: bool = False) -> bool:
+        """Select a node dot, and start dragging only when Ctrl is held."""
         if not self._osm_edit_enabled():
             return False
         dot = self._osm_dot_at(scene_pos)
         if dot is None:
             return False
+        self._set_osm_selected_dot(dot)
+        if not bool(ctrl_pressed):
+            self._osm_dragging_dot = None
+            self._osm_drag_start_scene = None
+            self._osm_drag_start_latlon = None
+            return True
+
         self._osm_dragging_dot = dot
         # Snapshot starting position for undo
         idx = self._osm_dot_to_index[dot]
@@ -1538,6 +2168,7 @@ class _OsmMixin:
             return False
         self._osm_dragging_dot = None
         self.view.setDragMode(QGraphicsView.DragMode.NoDrag)
+        self._set_osm_selected_dot(dot)
         idx = self._osm_dot_to_index[dot]
         item = self._osm_selected_item
         if item is None:
@@ -2144,6 +2775,7 @@ class _OsmMixin:
         removed_scene = meta[3].pop(idx)
         removed_latlon = meta[4].pop(idx)
         removed_nref = meta[6].pop(idx)
+        self._osm_node_tag_edits.pop(str(removed_nref[0]), None)
         self._rebuild_osm_path(item)
         self._show_osm_node_dots(item)
         # Undo entry
@@ -2502,6 +3134,106 @@ class _OsmMixin:
             clipped_parts.append(current)
         return clipped_parts
 
+    def _clip_polygon_to_rect(
+        self, points: list[tuple[float, float]], rect: tuple[float, float, float, float]
+    ) -> list[tuple[float, float]]:
+        if len(points) < 3:
+            return []
+        xmin, xmax, ymin, ymax = rect
+
+        ring = list(points)
+        if (
+            len(ring) >= 2
+            and math.hypot(ring[0][0] - ring[-1][0], ring[0][1] - ring[-1][1]) <= 1e-6
+        ):
+            ring = ring[:-1]
+        if len(ring) < 3:
+            return []
+
+        def _clip_against_edge(
+            vertices: list[tuple[float, float]],
+            inside_fn,
+            intersect_fn,
+        ) -> list[tuple[float, float]]:
+            if not vertices:
+                return []
+            clipped: list[tuple[float, float]] = []
+            prev = vertices[-1]
+            prev_inside = inside_fn(prev)
+            for cur in vertices:
+                cur_inside = inside_fn(cur)
+                if cur_inside:
+                    if not prev_inside:
+                        clipped.append(intersect_fn(prev, cur))
+                    clipped.append(cur)
+                elif prev_inside:
+                    clipped.append(intersect_fn(prev, cur))
+                prev = cur
+                prev_inside = cur_inside
+            return clipped
+
+        def _intersect_vertical(
+            p0: tuple[float, float], p1: tuple[float, float], x_edge: float
+        ) -> tuple[float, float]:
+            x0, y0 = p0
+            x1, y1 = p1
+            if math.isclose(x0, x1, abs_tol=1e-12):
+                return (float(x_edge), float(y0))
+            t = (x_edge - x0) / (x1 - x0)
+            return (float(x_edge), float(y0 + t * (y1 - y0)))
+
+        def _intersect_horizontal(
+            p0: tuple[float, float], p1: tuple[float, float], y_edge: float
+        ) -> tuple[float, float]:
+            x0, y0 = p0
+            x1, y1 = p1
+            if math.isclose(y0, y1, abs_tol=1e-12):
+                return (float(x0), float(y_edge))
+            t = (y_edge - y0) / (y1 - y0)
+            return (float(x0 + t * (x1 - x0)), float(y_edge))
+
+        clipped = ring
+        clipped = _clip_against_edge(
+            clipped,
+            lambda p: p[0] >= xmin,
+            lambda p0, p1: _intersect_vertical(p0, p1, xmin),
+        )
+        clipped = _clip_against_edge(
+            clipped,
+            lambda p: p[0] <= xmax,
+            lambda p0, p1: _intersect_vertical(p0, p1, xmax),
+        )
+        clipped = _clip_against_edge(
+            clipped,
+            lambda p: p[1] >= ymin,
+            lambda p0, p1: _intersect_horizontal(p0, p1, ymin),
+        )
+        clipped = _clip_against_edge(
+            clipped,
+            lambda p: p[1] <= ymax,
+            lambda p0, p1: _intersect_horizontal(p0, p1, ymax),
+        )
+        if len(clipped) < 3:
+            return []
+
+        deduped: list[tuple[float, float]] = []
+        for point in clipped:
+            if (
+                deduped
+                and math.hypot(deduped[-1][0] - point[0], deduped[-1][1] - point[1]) <= 1e-6
+            ):
+                continue
+            deduped.append((float(point[0]), float(point[1])))
+        if (
+            len(deduped) >= 2
+            and math.hypot(deduped[0][0] - deduped[-1][0], deduped[0][1] - deduped[-1][1]) <= 1e-6
+        ):
+            deduped.pop()
+        if len(deduped) < 3:
+            return []
+        deduped.append(deduped[0])
+        return deduped
+
     def _clip_osm_content_to_world_bounds(self, osm_content: str) -> str:
         if not osm_content or not self.map_ctx:
             return osm_content
@@ -2579,13 +3311,24 @@ class _OsmMixin:
                 if len(points) < 2:
                     continue
 
-                clipped_parts = self._clip_polyline_to_rect(points, rect)
+                is_closed_way = (
+                    len(refs) >= 4
+                    and refs[0] == refs[-1]
+                    and math.hypot(points[0][0] - points[-1][0], points[0][1] - points[-1][1])
+                    <= 1e-6
+                )
+                if is_closed_way:
+                    clipped_polygon = self._clip_polygon_to_rect(points, rect)
+                    clipped_parts = [clipped_polygon] if clipped_polygon else []
+                else:
+                    clipped_parts = self._clip_polyline_to_rect(points, rect)
                 if not clipped_parts:
                     continue
 
                 tags = [copy.deepcopy(tag) for tag in way.findall('tag')]
                 for idx, part in enumerate(clipped_parts):
-                    if len(part) < 2:
+                    min_points = 4 if is_closed_way else 2
+                    if len(part) < min_points:
                         continue
                     new_way = ET.Element('way')
                     if idx == 0:
@@ -2612,7 +3355,9 @@ class _OsmMixin:
                             # Check if this coordinate matches an original interesting node
                             # This is slightly simplified: if multiple nodes match, we pick one.
                             for nid, (osx, osy) in node_scene.items():
-                                if math.isclose(osx, sx, abs_tol=1e-6) and math.isclose(osy, sy, abs_tol=1e-6):
+                                if math.isclose(osx, sx, abs_tol=1e-6) and math.isclose(
+                                    osy, sy, abs_tol=1e-6
+                                ):
                                     orig_node = original_nodes[nid]
                                     if _is_interesting_node(orig_node):
                                         for otag in orig_node.findall('tag'):

@@ -435,6 +435,41 @@ class OpenDriveRenderer:
                 )
         return out
 
+    def get_signals(self) -> List[Dict]:
+        """Get all signals with their world positions."""
+        if self._data is None:
+            return []
+
+        out = []
+        for road in self._data.roads:
+            for signal in road.signals:
+                pose = self._pose_on_road(road.id, signal.s, signal.t)
+                if pose is None:
+                    continue
+                xw, yw = pose
+
+                # Calculate heading at signal position for orientation
+                hdg = 0.0
+                state = self._road_state_at_s(road.id, signal.s)
+                if state:
+                    hdg = state[3]
+
+                out.append(
+                    {
+                        'id': str(signal.id),
+                        'type': str(signal.type),
+                        'name': str(getattr(signal, 'name', '') or ''),
+                        'x': xw,
+                        'y': yw,
+                        'hdg': hdg,
+                        'h_offset': float(getattr(signal, 'h_offset', 0.0) or 0.0),
+                        'orientation': str(getattr(signal, 'orientation', 'none')),
+                        'country': str(getattr(signal, 'country', '') or ''),
+                        'value': str(getattr(signal, 'value', '') or ''),
+                    }
+                )
+        return out
+
     def _build_section_lane_polygons(
         self,
         road: ODRRoad,

@@ -1,6 +1,7 @@
 """OpenDRIVE display, editing and OSM→XODR conversion mixin."""
 
 import copy
+import math
 import hashlib
 import importlib
 import json
@@ -11,9 +12,8 @@ import threading
 
 # osm_to_xodr uses loguru with a default stderr sink — suppress it.
 from loguru import logger as _osm_to_xodr_logger
-from osm_to_xodr.config import NetconvertSettings
-from osm_to_xodr.netconvert import run_netconvert
-from osm_to_xodr.postprocess import convert_objects_to_signals
+from osm_to_xodr.config import AppSettings, NetconvertSettings
+from osm_to_xodr.converter import convert_osm_to_xodr
 
 _osm_to_xodr_logger.disable('osm_to_xodr')
 
@@ -39,7 +39,9 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QGraphicsItemGroup,
     QGraphicsPathItem,
+    QGraphicsPixmapItem,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -50,12 +52,37 @@ from PyQt6.QtWidgets import (
 
 from open_road_editor.constants import *  # noqa: F401,F403
 from open_road_editor.constants import _XODR_LANE_COLOR_DEFAULT, _XODR_LANE_COLORS  # noqa: F401
+from orbit.gui.graphics.signal_graphics import (
+    create_signal_pixmap,
+    create_orientation_indicator,
+)
+from orbit.models.signal import SignalType
 
 opendrive_renderer_bindings_py = importlib.import_module('open_road_editor.viewer._xodr_renderer')
 
 
 class _XodrMixin:
     """Mixin — see viewer/main.py for the assembled class."""
+
+    @staticmethod
+    def _xodr_visual_angle_from_heading(hdg_radians: float) -> float:
+        """Convert a road/lane heading in radians to viewer display angle."""
+        return math.degrees(float(hdg_radians))
+
+    @staticmethod
+    def _xodr_pixmap_rotation_from_visual_angle(visual_angle: float) -> float:
+        """Convert a desired display angle to QGraphicsItem rotation degrees.
+
+        The placeholder give-way pixmap points downward by default, so rotate it
+        until its apex faces *against* the travel direction (facing the driver).
+        """
+        # Previously was 270.0 (pointing along travel), now 90.0 (pointing against).
+        rotation = 90.0 - float(visual_angle)
+        while rotation < 0.0:
+            rotation += 360.0
+        while rotation >= 360.0:
+            rotation -= 360.0
+        return rotation
 
     def pil_to_qpixmap(self, im):
         if im is None:
@@ -64,6 +91,87 @@ class _XodrMixin:
         data = im.tobytes('raw', 'RGBA')
         qim = QImage(data, im.size[0], im.size[1], QImage.Format.Format_RGBA8888)
         return QPixmap.fromImage(qim)
+
+    def _on_xodr_signals_ready(self, signals) -> None:
+        """Main-thread slot: render signals in the scene."""
+        self._clear_xodr_signal_items()
+
+        if not signals or not self.map_ctx:
+            return
+
+        min_x = self.map_ctx.world_bounds[0]
+        min_y = self.map_ctx.world_bounds[2]
+        mpp = self.map_ctx.mpp
+
+        for sig in signals:
+            scene_x = (sig['x'] - min_x) / mpp
+            scene_y = (sig['y'] - min_y) / mpp
+
+            # Map string type to SignalType enum if possible
+            stype = SignalType.CUSTOM
+            try:
+                # Basic mapping for known types
+                if 'speed' in sig['type'].lower():
+                    stype = SignalType.SPEED_LIMIT
+                elif 'yield' in sig['type'].lower() or '206' in sig['type']:
+                    stype = SignalType.GIVE_WAY
+                elif 'stop' in sig['type'].lower() or '201' in sig['type']:
+                    stype = SignalType.STOP
+            except:
+                pass
+
+            value = None
+            if stype == SignalType.SPEED_LIMIT:
+                try:
+                    value = int(sig['value'])
+                except:
+                    value = 50
+
+            pixmap = create_signal_pixmap(stype, value, size=32)
+
+            # Use QGraphicsItemGroup style similar to Orbit
+            group = QGraphicsItemGroup()
+
+            pix_item = QGraphicsPixmapItem(pixmap)
+            pix_item.setOffset(-pixmap.width() / 2, -pixmap.height() / 2)
+
+            # Determine the travel direction the signal applies to.
+            # In OpenDRIVE, 'hdg' is the road direction (forward s).
+            # orientation='+' means the signal applies to forward s.
+            # orientation='-' means it applies to backward s (hdg + 180).
+            travel_hdg = self._xodr_visual_angle_from_heading(sig.get('hdg', 0.0))
+            if sig.get('orientation') == '-':
+                travel_hdg += 180.0
+
+            # Apply custom hOffset (relative to the orientation).
+            signal_visual_angle = travel_hdg + math.degrees(float(sig.get('h_offset', 0.0) or 0.0))
+
+            if stype == SignalType.GIVE_WAY:
+                pix_item.setRotation(
+                    self._xodr_pixmap_rotation_from_visual_angle(signal_visual_angle)
+                )
+            group.addToGroup(pix_item)
+
+            # Orientation indicator
+            # signal_visual_angle already accounts for road heading and orientation (+/-).
+            # It represents the travel direction for which the signal is valid.
+            # We add a 180 degree offset so the arrow points towards the driver / against travel,
+            # matching the requested visual style.
+            vis_angle = (signal_visual_angle + 180.0) % 360.0
+
+            path = create_orientation_indicator(vis_angle, length=20)
+            path_item = QGraphicsPathItem(path)
+            path_item.setPen(QPen(QColor(0, 0, 200, 180), 2))
+            group.addToGroup(path_item)
+
+            group.setPos(scene_x, scene_y)
+            group.setZValue(3.0)
+
+            self.scene.addItem(group)
+            self._xodr_vector_signal_items.append(group)
+
+        # Ensure signals pick up current layer/object visibility settings
+        self._apply_opendrive_layer_style()
 
     def toggle_sidebar(self):
         self._sidebar_visible = not self._sidebar_visible
@@ -226,7 +334,9 @@ class _XodrMixin:
                     return
                 # s_step=1.0 m gives smooth curves without excessive memory use
                 polygons = renderer.get_lane_polygons(XODR_POLYGON_STEP_M)
+                signals = renderer.get_signals()
                 self.xodr_polygons_ready.emit(polygons)
+                self.xodr_signals_ready.emit(signals)
             except Exception as exc:
                 print(f'fetch_local_opendrive_vector error: {exc}')
                 self.opendrive_refreshed.emit(None, -1, -1)
@@ -235,7 +345,7 @@ class _XodrMixin:
 
     def _on_xodr_polygons_ready(self, polygons) -> None:
         """Main-thread slot: convert LanePolygons to QGraphicsPathItems in the scene."""
-        self._clear_xodr_vector_items()
+        self._clear_xodr_vector_items(clear_signals=False)
 
         if not polygons or not self.map_ctx:
             self.opendrive_refreshed.emit(None, -1, -1)
@@ -442,7 +552,7 @@ class _XodrMixin:
             if succ_key:
                 self._xodr_succ_back.setdefault(succ_key, []).append(item)
 
-    def _clear_xodr_vector_items(self) -> None:
+    def _clear_xodr_vector_items(self, clear_signals: bool = True) -> None:
         """Remove the vector OpenDRIVE item group from the scene, if present."""
         if self._xodr_vector_group is not None:
             # Remove every child path item from the scene explicitly *before*
@@ -460,7 +570,18 @@ class _XodrMixin:
         self._xodr_pred_back.clear()
         self._xodr_succ_back.clear()
         self._xodr_lane_points_scene.clear()
+        self._clear_xodr_signal_items()
         self._xodr_is_vector = False
+
+    def _clear_xodr_signal_items(self) -> None:
+        """Remove vector signal markers from the scene."""
+        items = getattr(self, '_xodr_vector_signal_items', [])
+        for item in items:
+            try:
+                self.scene.removeItem(item)
+            except:
+                pass
+        items.clear()
 
     # ------------------------------------------------------------------
     # OSM file layer
@@ -508,6 +629,13 @@ class _XodrMixin:
                 for key, _, _ in options:
                     if key in src_section:
                         merged[section][key] = str(src_section[key]).strip()
+
+        # Migrate the historic broken default used by the viewer. This preserves
+        # explicitly customized values while preventing old projects/settings
+        # from silently reintroducing the roundabout sign regression.
+        junctions = merged.get('junctions', {})
+        if str(junctions.get('junction_join_dist', '')).strip() in {'2', '2.0'}:
+            junctions['junction_join_dist'] = '10.0'
         return merged
 
     @staticmethod
@@ -516,6 +644,7 @@ class _XodrMixin:
 
     def _build_netconvert_settings(self) -> NetconvertSettings:
         """Build a NetconvertSettings instance from the current UI settings dict."""
+        self._osm2xodr_settings = self._normalize_osm2xodr_settings(self._osm2xodr_settings)
         flat: dict = {}
         for section, options in OSM2XODR_SCHEMA:
             for key, field_type, default in options:
@@ -544,66 +673,29 @@ class _XodrMixin:
         nc = self._build_netconvert_settings()
         osm_file = Path(osm_path).resolve()
         output_file = Path(xodr_path).resolve()
-        args = [
-            '--osm-files',
-            str(osm_file),
-            '--opendrive-output',
-            str(output_file),
-            f'--opendrive-output.shape-match-dist={nc.shape_match_dist}',
-            '--output.street-names=true',
-            '--output.original-names=true',
-            # Custom scene projection instead of the library's hardcoded --proj.utm
-            '--proj',
-            proj_str,
-            '--offset.disable-normalization=true',
-            f'--aggregate-warnings={nc.aggregate_warnings}',
-            # Geometry
-            f'--geometry.remove={"true" if nc.remove_geometry else "false"}',
-            '--geometry.max-grade.fix=true',
-            '--geometry.min-dist=0.5',
-            # Junctions
-            f'--roundabouts.guess={"true" if nc.guess_roundabouts else "false"}',
-            f'--ramps.guess={"true" if nc.guess_ramps else "false"}',
-            '--edges.join=true',
-            '--junctions.join=false',
-            f'--junctions.join-dist={nc.junction_join_dist}',
-            '--junctions.join-same=10',
-            f'--junctions.corner-detail={nc.junction_corner_detail}',
-            f'--junctions.scurve-stretch={nc.junction_scurve_stretch}',
-            '--rectangular-lane-cut=true',
-            f'--no-turnarounds={"true" if nc.no_turnarounds else "false"}',
-            # OSM import
-            '--osm.all-attributes=true',
-            '--osm.layer-elevation=4',
-            '--osm.layer-elevation.max-grade=5',
-            f'--osm.turn-lanes={"true" if nc.import_turn_lanes else "false"}',
-            '--osm.lane-access=true',
-            f'--osm.sidewalks={"true" if nc.import_sidewalks else "false"}',
-            f'--osm.bike-access={"true" if nc.import_bike_access else "false"}',
-            f'--osm.crossings={"true" if nc.import_crossings else "false"}',
-            # Traffic lights
-            f'--tls.guess-signals={"true" if nc.guess_tls_signals else "false"}',
-            '--tls.discard-simple=true',
-            '--tls.join=true',
-            '--tls.group-signals=true',
-            '--tls.default-type=actuated',
-            '--crossings.guess=false',
-            '--sidewalks.guess=false',
-            '--sidewalks.guess.from-permissions=false',
-            '--bikelanes.guess=false',
-            '--bikelanes.guess.from-permissions=false',
-            # Defaults
-            f'--default.lanewidth={nc.lane_width}',
-            f'--default.sidewalk-width={nc.sidewalk_width}',
-            f'--default.bikelane-width={nc.bikelane_width}',
-            f'--default.crossing-width={nc.crossing_width}',
-            '--remove-edges.isolated=true',
-        ]
-        result = run_netconvert(args, cwd=osm_file.parent)
-        if not result.success or not output_file.exists():
-            return False, (result.stderr or result.stdout or 'Unknown error').strip()
-        # Post-process: convert <object> elements to <signal> elements
-        convert_objects_to_signals(output_file)
+
+        # Use the unified converter which includes OSMSignalExtractor and signal merging
+        app_settings = AppSettings(
+            verbose=True,
+            keep_intermediate=True,
+        )
+
+        # Override netconvert settings with current ORE values
+        # Note: ORE uses its own projection string for better accuracy in the scene
+        # We'll stick to ORE's direct call if we need custom projection,
+        # but let's see if we can use the converter with these overrides.
+
+        result = convert_osm_to_xodr(
+            osm_file,
+            output_file,
+            netconvert_settings=nc,
+            app_settings=app_settings,
+            projection=proj_str,
+        )
+
+        if not result.success:
+            return False, result.error or 'Unknown error'
+
         return True, ''
 
     def _open_osm2xodr_settings_dialog(self) -> None:
@@ -805,6 +897,56 @@ class _XodrMixin:
         self._arrange_import_layers(show_xodr=True, show_osm=True, osm_first=True)
         self._show_project_status('OpenDRIVE auto-refreshed')
         self.refresh_opendrive()
+
+    def refresh_all_layers(self) -> None:
+        """Refresh all visible layers: re-render OSM signs, re-convert OSM\u2192XODR, re-fetch tiles."""
+        # Always retry background tiles
+        self._retry_failed_tiles()
+
+        if not self.osm_path:
+            # No OSM loaded \u2014 just reload the XODR from file
+            if self.xodr_path and self.check_opendrive.isChecked():
+                self.refresh_opendrive()
+            return
+
+        self._flush_pending_osm_panel_edits()
+        osm_content = self._compose_current_osm_content()
+        if osm_content is None:
+            osm_content = self._osm_content
+        if not osm_content:
+            return
+
+        try:
+            fd, temp_osm_path = tempfile.mkstemp(suffix='.osm', prefix='refresh_all_')
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write(osm_content)
+        except Exception as exc:
+            self._show_project_status(f'Refresh failed: {exc}')
+            return
+
+        # Re-render OSM layer from the composed (edited) content so that moved
+        # give_way / signal nodes appear at their new positions.
+        if self.check_osm.isChecked():
+            self._osm_loading = True
+            self.lbl_osm_status.setText('Loading...')
+
+            def _run_osm(path=temp_osm_path, content=osm_content):
+                try:
+                    ways, signs, tree = self._parse_osm(path)
+                    self.osm_ways_ready.emit((ways, signs, tree, content))
+                except Exception:
+                    self.osm_ways_ready.emit(([], [], None, None))
+
+            threading.Thread(target=_run_osm, daemon=True).start()
+
+        # Re-convert OSM \u2192 XODR and refresh the OpenDRIVE layer
+        generated_xodr = self._convert_osm_to_xodr(temp_osm_path)
+        if generated_xodr:
+            self._suppress_next_xodr_title_update = True
+            self.edit_xodr.setText(generated_xodr)
+            if self.check_opendrive.isChecked():
+                self.refresh_opendrive()
+            self._show_project_status('All layers refreshed')
 
     def _refresh_opendrive_from_osm(self) -> None:
         if not self.osm_path:

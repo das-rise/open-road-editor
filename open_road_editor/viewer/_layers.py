@@ -45,7 +45,12 @@ class _LayersMixin:
         """Compose current OSM XML including in-memory edits and split-created ways."""
         if not self._osm_original_tree:
             return self._osm_content
-        if not self._osm_edits and not self._osm_created_ways and not self._osm_deleted_way_ids:
+        if (
+            not self._osm_edits
+            and not self._osm_node_tag_edits
+            and not self._osm_created_ways
+            and not self._osm_deleted_way_ids
+        ):
             return self._osm_content
 
         tree = copy.deepcopy(self._osm_original_tree)
@@ -148,6 +153,18 @@ class _LayersMixin:
                     t.set('v', str(v))
             _insert_way_ordered(way_el)
 
+        for nid, tags in self._osm_node_tag_edits.items():
+            node_el = node_elems.get(str(nid))
+            if node_el is None:
+                continue
+            for tag_el in list(node_el.findall('tag')):
+                node_el.remove(tag_el)
+            for k, v in tags.items():
+                if k:
+                    t = ET.SubElement(node_el, 'tag')
+                    t.set('k', str(k))
+                    t.set('v', str(v))
+
         ET.indent(tree, space='  ')
         buf = io.StringIO()
         tree.write(buf, encoding='unicode', xml_declaration=True)
@@ -170,41 +187,6 @@ class _LayersMixin:
             if getattr(self, '_fit_after_opendrive_load', False):
                 self._fit_after_opendrive_load = False
                 QTimer.singleShot(FIT_AFTER_LOAD_DELAY_MS, self._apply_load_view)
-            if self._pending_project_view_scale is not None:
-                view_scale = float(self._pending_project_view_scale)
-                self._pending_project_view_scale = None
-                world_center = self._pending_project_world_center
-                self._pending_project_world_center = None
-
-                def _restore_absolute_view(_scale=view_scale, _world=world_center):
-                    self.view.resetTransform()
-                    self.view.scale(_scale, _scale)
-                    if _world is not None and self.map_ctx:
-                        sx = (float(_world[0]) - self.map_ctx.world_offset[0]) / self.map_ctx.mpp
-                        sy = (float(_world[1]) - self.map_ctx.world_offset[1]) / self.map_ctx.mpp
-                        self.view.centerOn(QPointF(sx, sy))
-                    if self.grid_item:
-                        self.grid_item.update()
-                    self._update_zoom_spinbox(_scale)
-
-                QTimer.singleShot(ZOOM_RESTORE_DELAY_MS, _restore_absolute_view)
-            if self._pending_project_zoom_pct is not None:
-                zoom_pct = self._pending_project_zoom_pct
-                self._pending_project_zoom_pct = None
-                center = self._pending_project_viewport_center
-                self._pending_project_viewport_center = None
-
-                def _restore_zoom_and_center(_zp=zoom_pct, _c=center):
-                    self.spin_zoom.setValue(_zp)
-                    if _c is not None:
-                        # Centre the view on the saved scene position.  A short
-                        # extra delay lets the view re-layout after the zoom change.
-                        QTimer.singleShot(
-                            CENTER_ON_DELAY_MS,
-                            lambda: self.view.centerOn(QPointF(_c[0], _c[1])),
-                        )
-
-                QTimer.singleShot(ZOOM_RESTORE_DELAY_MS, _restore_zoom_and_center)
             return
         if image:
             self.opendrive_item.setPixmap(self.pil_to_qpixmap(image))
@@ -647,6 +629,8 @@ class _LayersMixin:
         if path != (self.xodr_path or ''):
             self.xodr_path = path
             self._xodr_content = None
+            if not self._restoring_project_payload:
+                self._suppress_auto_fit = False
             # Don't fit automatically
             # self._fit_after_opendrive_load = True
 
@@ -666,23 +650,28 @@ class _LayersMixin:
                 # print(f'Parsing bounds from new XODR (overlay only): {path}')
 
                 # Update window title unless this path change is part of project restore
+                programmatic_update = self._suppress_next_xodr_title_update
                 if self._suppress_next_xodr_title_update:
                     self._suppress_next_xodr_title_update = False
                 elif not self._restoring_project_payload:
                     self.town_name = os.path.basename(path).replace('.xodr', '')
-                    self.setWindowTitle(f'OpenRoadEditor - {self.town_name}')
+                    self._refresh_window_title()
 
                 # Draw bounding-box overlays for the XODR extent
                 # This uses map_ctx to project the bounds, so it will show where the
                 # XODR lands in the CURRENT world extent.
                 self._draw_xodr_bounds_rect()
 
-                # Enable checkbox if not already enabled
+                # Enable checkbox if not already enabled.
+                # For programmatic updates (e.g. refresh_all_layers) preserve the
+                # user's current visibility — the caller is responsible for refreshing.
                 if not self.check_opendrive.isChecked():
-                    self.check_opendrive.setChecked(True)
+                    if not programmatic_update:
+                        self.check_opendrive.setChecked(True)
                 else:
-                    # Trigger refresh explicitly since path changed
-                    self.refresh_opendrive()
+                    if not programmatic_update:
+                        # Trigger refresh explicitly since path changed
+                        self.refresh_opendrive()
 
                 # Reset saved grid state so grid auto-enables for the new map
                 # self._grid_saved_state = True
@@ -1279,6 +1268,13 @@ class _LayersMixin:
             for _item in self._xodr_item_meta:
                 _item.setVisible(render_visible)
 
+        # Signal visibility
+        show_objects = getattr(self, 'check_opendrive_objects', None)
+        show_objects_checked = show_objects.isChecked() if show_objects is not None else True
+        for sig_item in getattr(self, '_xodr_vector_signal_items', []):
+            sig_item.setVisible(render_visible and show_objects_checked)
+            sig_item.setOpacity(op)
+
         if not render_visible:
             pass  # xodr hover removed
 
@@ -1396,6 +1392,8 @@ class _LayersMixin:
             self.check_opendrive.setEnabled(False)
         else:
             self.check_opendrive.setEnabled(True)
+        if hasattr(self, 'check_opendrive_objects'):
+            self.check_opendrive_objects.setEnabled(has_xodr and self.check_opendrive.isChecked())
 
         # OSM layer constraints and visibility
         has_osm = self.osm_path is not None
@@ -1409,6 +1407,8 @@ class _LayersMixin:
         if not has_osm and self.check_osm.isChecked():
             self.check_osm.setChecked(False)
         self.check_osm.setEnabled(has_osm)
+        if hasattr(self, 'check_osm_objects'):
+            self.check_osm_objects.setEnabled(has_osm and self.check_osm.isChecked())
         if self._osm_vector_group is not None:
             self._apply_osm_layer_style()
             if not self.check_osm.isChecked():
@@ -1804,6 +1804,27 @@ class _LayersMixin:
                 self._osm_props_dragging = False
                 return True
 
+        # ── Node-properties resize handle ─────────────────────────
+        if obj is getattr(self, '_osm_node_props_resize_handle', None):
+            if t == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
+                self._osm_node_props_dragging = True
+                self._osm_node_props_drag_start_y = int(event.globalPosition().y())
+                self._osm_node_props_drag_start_h = self._osm_node_props_scroll.height()
+                return True
+            elif t == QEvent.Type.MouseMove and self._osm_node_props_dragging:
+                dy = int(event.globalPosition().y()) - self._osm_node_props_drag_start_y
+                new_h = max(
+                    self._osm_props_min_h,
+                    min(self._osm_props_max_h, self._osm_node_props_drag_start_h + dy),
+                )
+                self._set_osm_node_props_height(new_h)
+                return True
+            elif (
+                t == QEvent.Type.MouseButtonRelease and event.button() == Qt.MouseButton.LeftButton
+            ):
+                self._osm_node_props_dragging = False
+                return True
+
         # ── OSM right-click: stitch / split / add / delete node ───
         if (
             obj is self.view.viewport()
@@ -1849,6 +1870,44 @@ class _LayersMixin:
                     return True
 
         # ── OSM node-dot dragging (highest priority) ─────────────────
+        if obj is self.view and t == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Escape and self._osm_relation_pick_mode is not None:
+                self._osm_relation_pick_mode = None
+                self._show_project_status('Pick mode cancelled')
+                return True
+            if self._osm_edit_enabled() and (
+                event.modifiers() & Qt.KeyboardModifier.ControlModifier
+            ):
+                key = event.key()
+                if key in (
+                    Qt.Key.Key_Left,
+                    Qt.Key.Key_Right,
+                    Qt.Key.Key_Up,
+                    Qt.Key.Key_Down,
+                ):
+                    base_step_m = float(getattr(self, '_esri_nudge_step', 0.1))
+                    shift_step_m = float(getattr(self, '_esri_shift_nudge_step', 1.0))
+                    step_m = (
+                        shift_step_m
+                        if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+                        else base_step_m
+                    )
+                    mpp = max(float(self.map_ctx.mpp if self.map_ctx else 1.0), 1e-9)
+                    step_scene = float(step_m / mpp)
+                    dx = 0.0
+                    dy = 0.0
+                    if key == Qt.Key.Key_Left:
+                        dx = -step_scene
+                    elif key == Qt.Key.Key_Right:
+                        dx = step_scene
+                    elif key == Qt.Key.Key_Up:
+                        dy = -step_scene
+                    elif key == Qt.Key.Key_Down:
+                        dy = step_scene
+                    if self._on_osm_way_nudge(dx, dy):
+                        self._show_project_status(f'Roundabout moved ({step_m:.2f} m)')
+                        return True
+
         if obj is self.view.viewport():
             if (
                 t == QEvent.Type.MouseButtonPress
@@ -1890,10 +1949,11 @@ class _LayersMixin:
             ):
                 self._osm_click_press_pos = event.pos()
                 scene_pos = self.view.mapToScene(event.pos())
-                if self._on_osm_node_press(scene_pos):
+                ctrl_pressed = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
+                if self._on_osm_node_press(scene_pos, ctrl_pressed=ctrl_pressed):
+                    self._osm_suppress_next_click_select = True
                     self._osm_click_press_pos = None  # consumed by dot drag
                     return True
-                ctrl_pressed = bool(event.modifiers() & Qt.KeyboardModifier.ControlModifier)
                 if self._on_osm_way_press(scene_pos, ctrl_pressed=ctrl_pressed):
                     self._osm_click_press_pos = None  # consumed by roundabout drag
                     return True
@@ -1921,43 +1981,6 @@ class _LayersMixin:
                     scene_pos = self.view.mapToScene(event.pos())
                     self._on_osm_way_release(scene_pos)
                     return True
-            elif t == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
-                if self._osm_relation_pick_mode is not None:
-                    self._osm_relation_pick_mode = None
-                    self._show_project_status('Pick mode cancelled')
-                    return True
-            elif t == QEvent.Type.KeyPress and self._osm_edit_enabled():
-                if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-                    key = event.key()
-                    if key in (
-                        Qt.Key.Key_Left,
-                        Qt.Key.Key_Right,
-                        Qt.Key.Key_Up,
-                        Qt.Key.Key_Down,
-                    ):
-                        base_step_m = float(getattr(self, '_esri_nudge_step', 0.1))
-                        shift_step_m = float(getattr(self, '_esri_shift_nudge_step', 1.0))
-                        step_m = (
-                            shift_step_m
-                            if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
-                            else base_step_m
-                        )
-                        mpp = max(float(self.map_ctx.mpp if self.map_ctx else 1.0), 1e-9)
-                        step_scene = float(step_m / mpp)
-                        dx = 0.0
-                        dy = 0.0
-                        if key == Qt.Key.Key_Left:
-                            dx = -step_scene
-                        elif key == Qt.Key.Key_Right:
-                            dx = step_scene
-                        elif key == Qt.Key.Key_Up:
-                            dy = -step_scene
-                        elif key == Qt.Key.Key_Down:
-                            dy = step_scene
-                        if self._on_osm_way_nudge(dx, dy):
-                            self._show_project_status(f'Roundabout moved ({step_m:.2f} m)')
-                            return True
-
         # ── World-extent edge hover + drag ───────────────────────────
         # Active when the world-extent edges are present, ESRI-drag mode is off,
         # and no OSM dot is being dragged.
@@ -2158,6 +2181,7 @@ class _LayersMixin:
         self._position_world_edit_mode_button()
         self._position_osm_edit_mode_button()
         self._position_osm_props_edit_mode_button()
+        self._position_osm_node_props_edit_mode_button()
         self._position_esri_edit_mode_button()
         self._position_carla_edit_mode_button()
 
@@ -2194,13 +2218,54 @@ class _LayersMixin:
     def _apply_load_view(self):
         """Set the initial viewport position after the window is shown.
 
-        - If an XODR is loaded  → fit_to_window() so the entire map region is visible.
-        - Otherwise             → fit just the world-extent canvas, centered on the world
-                                  origin (0, 0) regardless of CARLA BEV server bounds.
-                                  CARLA BEV bounds may be far outside the default world
-                                  extent, so including them in the fit would push the
-                                  center far away from the origin.
+        - If a project is being restored, use its saved zoom and center.
+        - Otherwise, if an XODR is loaded  → fit_to_window().
+        - Otherwise                       → fit just the world-extent canvas.
         """
+        # 1. Absolute world-coordinate restoration (legacy)
+        if self._pending_project_view_scale is not None:
+            view_scale = float(self._pending_project_view_scale)
+            self._pending_project_view_scale = None
+            world_center = self._pending_project_world_center
+            self._pending_project_world_center = None
+            self._suppress_auto_fit = True
+
+            def _restore_absolute_view(_scale=view_scale, _world=world_center):
+                self.view.resetTransform()
+                self.view.scale(_scale, _scale)
+                if _world is not None and self.map_ctx:
+                    sx = (float(_world[0]) - self.map_ctx.world_offset[0]) / self.map_ctx.mpp
+                    sy = (float(_world[1]) - self.map_ctx.world_offset[1]) / self.map_ctx.mpp
+                    self.view.centerOn(QPointF(sx, sy))
+                if self.grid_item:
+                    self.grid_item.update()
+                self._update_zoom_spinbox(_scale)
+
+            QTimer.singleShot(ZOOM_RESTORE_DELAY_MS, _restore_absolute_view)
+            return
+
+        # 2. Scene-coordinate based restoration (modern)
+        if self._pending_project_zoom_pct is not None:
+            zp = self._pending_project_zoom_pct
+            c = self._pending_project_viewport_center
+            self._pending_project_zoom_pct = None
+            self._pending_project_viewport_center = None
+            self._suppress_auto_fit = True
+
+            self.spin_zoom.setValue(zp)
+            if c is not None:
+                # Use a short delay for centering to let the view re-layout after zoom.
+                QTimer.singleShot(
+                    CENTER_ON_DELAY_MS,
+                    lambda: self.view.centerOn(QPointF(c[0], c[1])),
+                )
+            return
+
+        if self._suppress_auto_fit:
+            # We've already restored a project viewport or manually loaded a map;
+            # do not overwrite it with an automatic fit.
+            return
+
         if bool(self.xodr_path):
             self.fit_to_window()
         else:

@@ -71,8 +71,10 @@ class OpenDriveViewer(
     osm_ways_ready = pyqtSignal(object)
     #: Emitted by background layer pipeline planner with UI-safe actions
     layer_pipeline_ready = pyqtSignal(object, int)
-    #: Emitted from bg thread when netconvert auto-converts OSM→XODR after a drag
+    #: Emitted from background thread when netconvert auto-converts OSM→XODR after a drag
     xodr_auto_converted = pyqtSignal(str)
+    #: Emitted from background thread with a list of signal dictionaries
+    xodr_signals_ready = pyqtSignal(object)
 
     def __init__(
         self,
@@ -108,10 +110,10 @@ class OpenDriveViewer(
         self._cli_server_port = server_port
         self.town_name = town_name
         self.xodr_path = xodr_path
-        self.setWindowTitle(f'OpenRoadEditor - {town_name}')
         self.settings = QSettings(QSETTINGS_ORG, QSETTINGS_APP)
         self.project_file_path: str | None = None
         self._preferred_project_save_dir: str | None = None
+        self._refresh_window_title()
         self._pending_project_zoom_pct: int | None = None
         self._pending_project_viewport_center: tuple | None = None  # (scene_x, scene_y)
         self._pending_project_view_scale: float | None = None
@@ -123,6 +125,7 @@ class OpenDriveViewer(
         )
         self._restoring_project_payload = False
         self._suppress_next_xodr_title_update = False
+        self._suppress_auto_fit = False
 
         self.esri_refreshed.connect(self.on_esri_refreshed)
         self.carla_bev_refreshed.connect(self.on_carla_bev_refreshed)
@@ -132,6 +135,7 @@ class OpenDriveViewer(
         self.osm_ways_ready.connect(self._on_osm_ways_ready)
         self.layer_pipeline_ready.connect(self._on_layer_pipeline_ready)
         self.xodr_auto_converted.connect(self._on_xodr_auto_converted)
+        self.xodr_signals_ready.connect(self._on_xodr_signals_ready)
 
         self.spinner_angle = 0
         self.carla_bev_spinner_angle = 0
@@ -219,6 +223,7 @@ class OpenDriveViewer(
         self._xodr_pred_back: dict = {}
         self._xodr_succ_back: dict = {}
         self._xodr_lane_points_scene: dict = {}  # lane_key -> [(sx, sy), ...]
+        self._xodr_vector_signal_items: list = []  # list of QGraphicsItemGroup for signals
 
         # OSM vector overlay state
         self.osm_path: str | None = None
@@ -230,9 +235,14 @@ class OpenDriveViewer(
         self._osm_way_connectivity: dict = {}  # way_id -> (preceding_ids, succeeding_ids)
         self._osm_hover_item = None
         self._osm_selected_item = None
+        self._osm_sign_item_positions: dict = {}  # sign item → (px, py)
+        self._osm_selected_sign_item = None  # currently selected sign node item
+        self._osm_selected_sign_node_id: str | None = None
         # OSM editing state
         self._osm_node_dots: list = []  # QGraphicsEllipseItem markers on selected segment
         self._osm_dot_to_index: dict = {}  # dot_item → node index
+        self._osm_selected_dot = None  # currently selected node dot on selected segment
+        self._osm_selected_node_index: int | None = None  # selected node index on segment
         self._osm_selected_arrows: list = []  # direction arrows for selected segment
         self._osm_dragging_dot = None  # dot currently being dragged
         self._osm_dragging_way_item = None  # selected roundabout way currently being dragged
@@ -242,12 +252,14 @@ class OpenDriveViewer(
         self._osm_drag_start_latlon = None  # (lat, lon) when drag began
         self._osm_click_press_pos = None  # viewport mouse pos at press for click-vs-drag
         self._osm_edits: dict = {}  # way_id → {'tags': {...}, 'node_coords': [(lat,lon),…]}
+        self._osm_node_tag_edits: dict = {}  # node_id → {'tag': 'value', ...}
         self._osm_created_ways: dict = {}  # new_way_id → {'tags': {...}, 'node_coords': [...]}
         self._osm_deleted_way_ids: set = set()  # existing way IDs removed by merge
         self._osm_dirty: bool = False  # True when OSM edits changed since last successful save
         self._osm_relation_edit_mode: dict = {'preceding': False, 'succeeding': False}
         self._osm_relation_draft: dict = {'preceding': None, 'succeeding': None}
         self._osm_tags_edit_mode: bool = False
+        self._osm_node_tags_edit_mode: bool = False
         self._osm_relation_hover_map: dict = {}  # widget -> way_id
         self._osm_relation_pick_mode: str | None = None  # relation currently awaiting map pick
         self._osm_suppress_next_click_select: bool = (
@@ -576,6 +588,13 @@ class OpenDriveViewer(
             )
         self.check_opendrive.stateChanged.connect(self._on_layer_checkbox_changed)
         _xodr_row.addWidget(self.check_opendrive)
+        self.check_opendrive_objects = QCheckBox('Objects')
+        self.check_opendrive_objects.setChecked(
+            self.settings.value('show_opendrive_objects', True, type=bool)
+        )
+        self.check_opendrive_objects.setEnabled(self.check_opendrive.isChecked())
+        self.check_opendrive_objects.stateChanged.connect(self._on_layer_checkbox_changed)
+        _xodr_row.addWidget(self.check_opendrive_objects)
         _xodr_row.addStretch()
         self.lbl_opendrive_status = QLabel('')
         self.lbl_opendrive_status.setFixedWidth(LAYER_STATUS_LABEL_WIDTH)
@@ -594,6 +613,11 @@ class OpenDriveViewer(
         self.check_osm.setChecked(self.settings.value('show_osm', False, type=bool))
         self.check_osm.stateChanged.connect(self._on_layer_checkbox_changed)
         _osm_row.addWidget(self.check_osm)
+        self.check_osm_objects = QCheckBox('Objects')
+        self.check_osm_objects.setChecked(self.settings.value('show_osm_objects', True, type=bool))
+        self.check_osm_objects.setEnabled(self.check_osm.isChecked())
+        self.check_osm_objects.stateChanged.connect(self._on_layer_checkbox_changed)
+        _osm_row.addWidget(self.check_osm_objects)
         _osm_row.addStretch()
         self.lbl_osm_status = QLabel('')
         self.lbl_osm_status.setFixedWidth(LAYER_STATUS_LABEL_WIDTH)
@@ -737,6 +761,13 @@ class OpenDriveViewer(
         )
         self.btn_osm2xodr_settings.clicked.connect(self._open_osm2xodr_settings_dialog)
         osm_alpha_row.addWidget(self.btn_osm2xodr_settings)
+        self.btn_reverse_osm_sign = QPushButton('Reverse Sign')
+        self.btn_reverse_osm_sign.setToolTip(
+            'Add a 180 degree heading offset to the selected OSM sign node and regenerate OpenDRIVE'
+        )
+        self.btn_reverse_osm_sign.clicked.connect(self._reverse_selected_osm_sign)
+        self.btn_reverse_osm_sign.setVisible(False)
+        osm_alpha_row.addWidget(self.btn_reverse_osm_sign)
         osm_alpha_row.addStretch()
         osm_opts_layout.addLayout(osm_alpha_row)
 
@@ -781,6 +812,60 @@ class OpenDriveViewer(
         _props_group_layout.addWidget(self._osm_props_scroll)
         _props_group_layout.addWidget(self._osm_props_resize_handle)
         osm_opts_layout.addWidget(self._osm_props_group)
+
+        self._osm_node_props_group = QGroupBox('Node Properties')
+        self._osm_node_props_group.setVisible(False)
+        self.btn_osm_node_props_edit_mode = QPushButton(self._osm_node_props_group)
+        self.btn_osm_node_props_edit_mode.setCheckable(True)
+        self.btn_osm_node_props_edit_mode.setChecked(False)
+        self.btn_osm_node_props_edit_mode.setFixedSize(24, 20)
+        self.btn_osm_node_props_edit_mode.toggled.connect(
+            self._on_osm_node_props_edit_mode_toggled
+        )
+        self._on_osm_node_props_edit_mode_toggled(False)
+        self._position_osm_node_props_edit_mode_button()
+        _node_props_layout = QVBoxLayout(self._osm_node_props_group)
+        _node_props_layout.setContentsMargins(4, 4, 4, 4)
+        _node_props_layout.setSpacing(2)
+        self._osm_node_tag_editor_widget = QWidget()
+        self._osm_node_tag_rows: list = []
+        self._osm_node_props_scroll = QScrollArea()
+        self._osm_node_props_scroll.setWidgetResizable(True)
+        self._osm_node_props_scroll.setWidget(self._osm_node_tag_editor_widget)
+        self._osm_node_props_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        _node_initial_h = int(self.settings.value('osm_node_props_height', self._osm_props_max_h))
+        self._set_osm_node_props_height(_node_initial_h)
+        _node_props_layout.addWidget(self._osm_node_props_scroll)
+        self._osm_node_props_resize_handle = QWidget()
+        self._osm_node_props_resize_handle.setFixedHeight(RESIZE_HANDLE_HEIGHT)
+        self._osm_node_props_resize_handle.setCursor(Qt.CursorShape.SizeVerCursor)
+        self._osm_node_props_resize_handle.setStyleSheet(
+            'background: qlineargradient(y1:0,y2:1,stop:0 transparent,stop:0.3 #999,stop:0.5 #666,stop:0.7 #999,stop:1 transparent);'
+        )
+        self._osm_node_props_resize_handle.installEventFilter(self)
+        self._osm_node_props_dragging = False
+        self._osm_node_props_drag_start_y = 0
+        self._osm_node_props_drag_start_h = 0
+        _node_props_layout.addWidget(self._osm_node_props_resize_handle)
+        self._osm_node_sign_actions = QWidget()
+        _node_sign_actions_layout = QHBoxLayout(self._osm_node_sign_actions)
+        _node_sign_actions_layout.setContentsMargins(0, 0, 0, 0)
+        _node_sign_actions_layout.setSpacing(4)
+        self.btn_osm_node_add_sign = QPushButton('Add Sign Info')
+        self.btn_osm_node_add_sign.setToolTip(
+            'Add a generic traffic_sign tag to the selected node'
+        )
+        self.btn_osm_node_add_sign.clicked.connect(self._add_sign_info_to_selected_osm_node)
+        _node_sign_actions_layout.addWidget(self.btn_osm_node_add_sign)
+        self.btn_osm_node_remove_sign = QPushButton('Remove Sign Info')
+        self.btn_osm_node_remove_sign.setToolTip('Remove sign-related tags from the selected node')
+        self.btn_osm_node_remove_sign.clicked.connect(
+            self._remove_sign_info_from_selected_osm_node
+        )
+        _node_sign_actions_layout.addWidget(self.btn_osm_node_remove_sign)
+        _node_sign_actions_layout.addStretch()
+        _node_props_layout.addWidget(self._osm_node_sign_actions)
+        osm_opts_layout.addWidget(self._osm_node_props_group)
 
         panel.addWidget(self.grp_osm_opts)
         panel.addWidget(self.grp_xodr_opts)
@@ -1092,14 +1177,15 @@ class OpenDriveViewer(
 
             QTimer.singleShot(SPLITTER_RESTORE_DELAY_MS, _restore_splitter_default)
 
-        # Permanent viewport event filter for hover detection (and ESRI drag)
+        # Permanent event filters for hover detection, drag handling, and key routing.
+        self.view.installEventFilter(self)
         self.view.viewport().installEventFilter(self)
 
         self.update_imagery_alignment()
 
         # If launched with a --xodr path, show the OpenDRIVE layer row
         if self.xodr_path:
-            self._arrange_import_layers(show_xodr=True, show_osm=False)
+            self._arrange_import_layers(show_xodr=True, show_osm=False, reset_objects=True)
 
         self.update_visibility()
 

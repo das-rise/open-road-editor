@@ -785,7 +785,7 @@ class _TilesMixin:
             meta_town = str(meta.get('town') or '').strip()
             if meta_town and meta_town != self.town_name:
                 self.town_name = meta_town
-                self.setWindowTitle(f'OpenRoadEditor - {self.town_name}')
+                self._refresh_window_title()
             print(f'[CARLA] Town: {meta_town or "(unknown)"}')
             print(f'[CARLA] Tile cache dir: {os.path.join("tiles", f"carla_{self.town_name}")}')
             zoom = self.spin_tile_zoom.value()
@@ -1222,8 +1222,8 @@ class _TilesMixin:
         self._do_tile_refresh(force=False)
 
     def on_tile_zoom_refresh(self) -> None:
-        """Button handler: retry failed/missing tiles on enabled layers."""
-        self._retry_failed_tiles()
+        """Button handler: refresh all layers including tiles, OSM signs and OpenDRIVE."""
+        self.refresh_all_layers()
 
     def _retry_failed_tiles(self) -> None:
         """Re-fetch failed (placeholder) tiles without discarding successfully-loaded tiles.
@@ -1360,6 +1360,7 @@ class _TilesMixin:
                 if composed_osm is not None:
                     self._osm_content = composed_osm
                     self._osm_edits.clear()
+                    self._osm_node_tag_edits.clear()
                     self._osm_created_ways.clear()
                     self._osm_deleted_way_ids.clear()
                 self.save_project()
