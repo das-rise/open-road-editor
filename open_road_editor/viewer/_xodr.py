@@ -135,15 +135,10 @@ class _XodrMixin:
             pix_item = QGraphicsPixmapItem(pixmap)
             pix_item.setOffset(-pixmap.width() / 2, -pixmap.height() / 2)
 
-            # Determine the travel direction the signal applies to.
-            # In OpenDRIVE, 'hdg' is the road direction (forward s).
-            # orientation='+' means the signal applies to forward s.
-            # orientation='-' means it applies to backward s (hdg + 180).
+            # The signal's visual heading is fully encoded in hOffset
+            # (including any orientation-based 180° flip baked in by the
+            # postprocessor), so we just add it to the road heading.
             travel_hdg = self._xodr_visual_angle_from_heading(sig.get('hdg', 0.0))
-            if sig.get('orientation') == '-':
-                travel_hdg += 180.0
-
-            # Apply custom hOffset (relative to the orientation).
             signal_visual_angle = travel_hdg + math.degrees(float(sig.get('h_offset', 0.0) or 0.0))
 
             if stype == SignalType.GIVE_WAY:
