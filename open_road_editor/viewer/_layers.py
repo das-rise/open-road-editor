@@ -50,6 +50,7 @@ class _LayersMixin:
             and not self._osm_node_tag_edits
             and not self._osm_created_ways
             and not self._osm_deleted_way_ids
+            and not self._osm_deleted_node_ids
         ):
             return self._osm_content
 
@@ -152,6 +153,12 @@ class _LayersMixin:
                     t.set('k', str(k))
                     t.set('v', str(v))
             _insert_way_ordered(way_el)
+
+        for nid in self._osm_deleted_node_ids:
+            node_el = node_elems.get(str(nid))
+            if node_el is not None:
+                root.remove(node_el)
+                node_elems.pop(str(nid), None)
 
         for nid, tags in self._osm_node_tag_edits.items():
             node_el = node_elems.get(str(nid))

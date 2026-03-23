@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <OpenDRIVE>
-    <header revMajor="1" revMinor="4" name="" version="1.00" date="Mon Mar 23 14:19:52 2026" north="1414.33" south="836.38" east="1814.52" west="1150.84">
+    <header revMajor="1" revMinor="4" name="" version="1.00" date="Mon Mar 23 18:25:12 2026" north="1414.33" south="836.38" east="1814.52" west="1150.84">
         <geoReference>
  
  +proj=tmerc +lat_0=57.474079 +lon_0=11.984080
@@ -279,9 +279,8 @@
     </road>
     <road name="" length="18.40617849" id="525" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="8" />
             <successor elementType="junction" elementId="6" />
-        </link>
+        <predecessor elementType="road" elementId="569" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1253.79000000" y="1047.52000000" hdg="1.96583312" length="3.48230788">
@@ -308,7 +307,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -322,7 +321,7 @@
     <road name="" length="194.68386606" id="526" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="9" />
-        </link>
+        <successor elementType="road" elementId="570" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1406.37858994" y="1191.09385972" hdg="1.65693658" length="3.23814661">
@@ -415,7 +414,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -525,7 +524,7 @@
     <road name="Säröleden" length="277.92176259" id="529" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="10" />
-        </link>
+        <successor elementType="road" elementId="617" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1397.52863488" y="1173.06713557" hdg="2.74421404" length="12.41145879">
@@ -588,7 +587,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="22.22" />
@@ -736,9 +735,8 @@
     </road>
     <road name="" length="59.93307358" id="533" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="15" />
             <successor elementType="junction" elementId="16" />
-        </link>
+        <predecessor elementType="road" elementId="612" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1558.80000000" y="1121.29000000" hdg="-1.52872068" length="19.32956806">
@@ -799,7 +797,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -1019,9 +1017,8 @@
     </road>
     <road name="Säröleden" length="66.23727430" id="538" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="19" />
             <successor elementType="junction" elementId="20" />
-        </link>
+        <predecessor elementType="road" elementId="590" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1814.52000000" y="1162.97000000" hdg="-2.85071296" length="0.20000000">
@@ -1054,7 +1051,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="19.44" />
@@ -1339,9 +1336,8 @@
     </road>
     <road name="" length="281.40107789" id="542" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="24" />
             <successor elementType="junction" elementId="9" />
-        </link>
+        <predecessor elementType="road" elementId="609" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1150.84000000" y="1315.21000000" hdg="-0.58928712" length="10.17503377">
@@ -1458,7 +1454,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="2.00" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -1828,7 +1824,7 @@
     <road name="" length="110.68069315" id="548" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="12" />
-        </link>
+        <successor elementType="road" elementId="616" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1213.93130708" y="1188.24103126" hdg="2.11884167" length="13.28706456">
@@ -1873,7 +1869,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="13.89" />
@@ -1887,7 +1883,7 @@
     <road name="Hönsarydsliden" length="127.75063888" id="549" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="28" />
-        </link>
+        <successor elementType="road" elementId="618" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1691.64852199" y="1162.70068032" hdg="0.40918474" length="7.45528664">
@@ -1932,7 +1928,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="13.89" />
@@ -1945,8 +1941,7 @@
     </road>
     <road name="Dunvägen" length="190.76373291" id="550" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="29" />
-        </link>
+            <predecessor elementType="road" elementId="551" contactPoint="end" /><successor elementType="road" elementId="551" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1763.91000000" y="1260.19000000" hdg="0.26249001" length="37.37308654">
@@ -1973,7 +1968,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><predecessor id="-1" /><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="19.44" />
@@ -1986,8 +1981,7 @@
     </road>
     <road name="Dunvägen" length="190.76373291" id="551" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="30" />
-        </link>
+            <successor elementType="road" elementId="550" contactPoint="start" /><predecessor elementType="road" elementId="550" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1769.60000000" y="1414.33000000" hdg="-1.29744528" length="137.67243705">
@@ -2014,7 +2008,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><successor id="-1" /><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="19.44" />
@@ -2085,51 +2079,51 @@
         <signals />
         <userData code="sumoId" value="-350844236#0" />
     </road>
-    <road name="" length="57.33304520" id="553" junction="-1">
+    <road name="" length="57.33216929" id="553" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="27" />
             <successor elementType="junction" elementId="16" />
         </link>
         <type s="0" type="town" />
         <planView>
-            <geometry s="0.00000000" x="1498.77353770" y="1020.64914124" hdg="1.08101377" length="3.92968127">
+            <geometry s="0.00000000" x="1498.77170019" y="1020.65199339" hdg="1.08188813" length="3.92332708">
                 <line />
             </geometry>
-            <geometry s="3.92968127" x="1500.62219344" y="1024.11683022" hdg="1.08101377" length="5.55422965">
-                <paramPoly3 aU="0.00000000" bU="4.16453849" cU="4.16452421" dU="-2.78361718" aV="0.00000000" bV="0.00000000" cV="-0.42670357" dV="0.14260661" pRange="normalized" />
+            <geometry s="3.92332708" x="1500.61433889" y="1024.11568766" hdg="1.08188813" length="5.55406321">
+                <paramPoly3 aU="0.00000000" bU="4.16438103" cU="4.16436591" dU="-2.78372076" aV="0.00000000" bV="0.00000000" cV="-0.43280691" dV="0.14465725" pRange="normalized" />
             </geometry>
-            <geometry s="9.48391092" x="1503.48165679" y="1028.87667753" hdg="0.97864191" length="8.46848887">
+            <geometry s="9.47739029" x="1503.47302030" y="1028.87575973" hdg="0.97805068" length="8.47407282">
                 <line />
             </geometry>
-            <geometry s="17.95239979" x="1508.20834321" y="1035.90332247" hdg="0.97864191" length="5.55549958">
-                <paramPoly3 aU="0.00000000" bU="4.16626073" cU="4.15711993" dU="-2.77334758" aV="0.00000000" bV="0.00000000" cV="-0.48576969" dV="0.25057455" pRange="normalized" />
+            <geometry s="17.95146312" x="1508.20697970" y="1035.90424027" hdg="0.97805068" length="5.55556218">
+                <paramPoly3 aU="0.00000000" bU="4.16631274" cU="4.15729896" dU="-2.77344005" aV="0.00000000" bV="0.00000000" cV="-0.48238688" dV="0.24882952" pRange="normalized" />
             </geometry>
-            <geometry s="23.50789937" x="1511.50124459" y="1040.37713342" hdg="0.92585649" length="1.81684116">
-                <paramPoly3 aU="0.00000000" bU="1.36207748" cU="1.36881218" dU="-0.91571138" aV="0.00000000" bV="0.00000000" cV="-0.01319914" dV="-0.04475812" pRange="normalized" />
+            <geometry s="23.50702530" x="1511.50124459" y="1040.37713342" hdg="0.92563378" length="1.81683933">
+                <paramPoly3 aU="0.00000000" bU="1.36207748" cU="1.36881502" dU="-0.91570136" aV="0.00000000" bV="0.00000000" cV="-0.01228760" dV="-0.04526541" pRange="normalized" />
             </geometry>
-            <geometry s="25.32474054" x="1512.63875541" y="1041.79286658" hdg="0.80761973" length="5.52701860">
+            <geometry s="25.32386463" x="1512.63875541" y="1041.79286658" hdg="0.80761973" length="5.52701860">
                 <paramPoly3 aU="0.00000000" bU="4.14261483" cU="4.17825095" dU="-2.79959882" aV="0.00000000" bV="0.00000000" cV="0.12074482" dV="-0.27731329" pRange="normalized" />
             </geometry>
-            <geometry s="30.85175913" x="1516.56831145" y="1045.67455330" hdg="0.66460187" length="15.38866344">
+            <geometry s="30.85088322" x="1516.56831145" y="1045.67455330" hdg="0.66460187" length="15.38866344">
                 <line />
             </geometry>
-            <geometry s="46.24042257" x="1528.68168855" y="1055.16544670" hdg="0.66460187" length="5.55970757">
+            <geometry s="46.23954667" x="1528.68168855" y="1055.16544670" hdg="0.66460187" length="5.55970757">
                 <paramPoly3 aU="0.00000000" bU="4.16972310" cU="4.16972306" dU="-2.78018454" aV="0.00000000" bV="0.00000000" cV="-0.09610951" dV="0.03204076" pRange="normalized" />
             </geometry>
-            <geometry s="51.80013015" x="1533.09724436" y="1058.54366540" hdg="0.64155352" length="5.53291505">
+            <geometry s="51.79925424" x="1533.09724436" y="1058.54366540" hdg="0.64155352" length="5.53291505">
                 <line />
             </geometry>
         </planView>
         <elevationProfile>
-            <elevation s="0.00000000" a="-0.21337192" b="-0.00098784" c="0" d="0" />
-            <elevation s="3.92968127" a="-0.21725381" b="-0.00074068" c="-0.00000035" d="0.00000805" />
-            <elevation s="9.48391092" a="-0.22000000" b="0.00000000" c="0" d="0" />
-            <elevation s="17.95239979" a="-0.22000000" b="0.00000000" c="-0.00025222" d="0.00002342" />
-            <elevation s="23.50789937" a="-0.22376893" b="-0.00063385" c="-0.00118920" d="0.00043602" />
-            <elevation s="25.32474054" a="-0.22623107" b="-0.00063710" c="-0.00013959" d="0.00002379" />
-            <elevation s="30.85175913" a="-0.23000000" b="0.00000000" c="0" d="0" />
-            <elevation s="46.24042257" a="-0.23000000" b="0.00000000" c="-0.00011942" d="0.00000716" />
-            <elevation s="51.80013015" a="-0.23246066" b="-0.00088513" c="0" d="0" />
+            <elevation s="0.00000000" a="-0.21337540" b="-0.00098826" c="0" d="0" />
+            <elevation s="3.92332708" a="-0.21725265" b="-0.00074098" c="-0.00000036" d="0.00000805" />
+            <elevation s="9.47739029" a="-0.22000000" b="0.00000000" c="0" d="0" />
+            <elevation s="17.95146312" a="-0.22000000" b="0.00000000" c="-0.00025221" d="0.00002342" />
+            <elevation s="23.50702530" a="-0.22376893" b="-0.00063384" c="-0.00118921" d="0.00043602" />
+            <elevation s="25.32386463" a="-0.22623107" b="-0.00063710" c="-0.00013959" d="0.00002379" />
+            <elevation s="30.85088322" a="-0.23000000" b="0.00000000" c="0" d="0" />
+            <elevation s="46.23954667" a="-0.23000000" b="0.00000000" c="-0.00011942" d="0.00000716" />
+            <elevation s="51.79925424" a="-0.23246066" b="-0.00088513" c="0" d="0" />
         </elevationProfile>
         <lateralProfile />
         <lanes>
@@ -2291,9 +2285,8 @@
     </road>
     <road name="" length="120.11163668" id="556" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="31" />
             <successor elementType="junction" elementId="28" />
-        </link>
+        <predecessor elementType="road" elementId="623" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1666.20000000" y="1279.69000000" hdg="-2.25355218" length="13.78275943">
@@ -2344,7 +2337,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -2357,9 +2350,8 @@
     </road>
     <road name="" length="77.53661202" id="557" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="32" />
             <successor elementType="junction" elementId="33" />
-        </link>
+        <predecessor elementType="road" elementId="624" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1645.39000000" y="1236.24000000" hdg="0.15707234" length="7.73522463">
@@ -2398,7 +2390,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -2520,7 +2512,7 @@
     <road name="" length="35.78161928" id="559" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="33" />
-        </link>
+        <successor elementType="road" elementId="626" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1668.96319014" y="1167.37744973" hdg="2.72374865" length="0.20000000">
@@ -2553,7 +2545,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -2600,10 +2592,10 @@
         <signals />
         <userData code="sumoId" value="-350975672#1" />
     </road>
-    <road name="" length="243.25843036" id="561" junction="-1">
+    <road name="" length="243.25854061" id="561" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="22" />
-        </link>
+        <successor elementType="road" elementId="628" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1580.83044278" y="1093.47391369" hdg="0.58623081" length="0.48464994">
@@ -2630,55 +2622,55 @@
             <geometry s="59.75639216" x="1634.19990585" y="1120.27025591" hdg="0.41849169" length="5.54662913">
                 <paramPoly3 aU="0.00000000" bU="4.15880795" cU="4.13365281" dU="-2.76226618" aV="0.00000000" bV="0.00000000" cV="-0.81578968" dV="0.40979736" pRange="normalized" />
             </geometry>
-            <geometry s="65.30302129" x="1639.41784914" y="1122.14667530" hdg="0.32163296" length="2.63139730">
-                <paramPoly3 aU="0.00000000" bU="1.97323256" cU="1.96925931" dU="-1.31476459" aV="0.00000000" bV="0.00000000" cV="-0.24130526" dV="0.11058419" pRange="normalized" />
+            <geometry s="65.30302129" x="1639.41784914" y="1122.14667530" hdg="0.32163296" length="2.63139643">
+                <paramPoly3 aU="0.00000000" bU="1.97323256" cU="1.96924426" dU="-1.31474954" aV="0.00000000" bV="-0.00000000" cV="-0.24150172" dV="0.11078065" pRange="normalized" />
             </geometry>
-            <geometry s="67.93441859" x="1641.95215086" y="1122.85332470" hdg="0.24510609" length="5.55571179">
-                <paramPoly3 aU="0.00000000" bU="4.16674378" cU="4.16611472" dU="-2.77764819" aV="0.00000000" bV="0.00000000" cV="-0.13447728" dV="0.06392024" pRange="normalized" />
+            <geometry s="67.93441772" x="1641.95215086" y="1122.85332470" hdg="0.24520594" length="5.55574346">
+                <paramPoly3 aU="0.00000000" bU="4.16676798" cU="4.16613972" dU="-2.77766178" aV="0.00000000" bV="0.00000000" cV="-0.13418765" dV="0.06389323" pRange="normalized" />
             </geometry>
-            <geometry s="73.49013038" x="1647.35844608" y="1124.13289962" hdg="0.22657885" length="0.96103498">
-                <paramPoly3 aU="0.00000000" bU="0.72069589" cU="0.72060428" dU="-0.48091775" aV="0.00000000" bV="0.00000000" cV="-0.04995518" dV="0.01758329" pRange="normalized" />
+            <geometry s="73.49016118" x="1647.35828907" y="1124.13370287" hdg="0.22679840" length="0.95122010">
+                <paramPoly3 aU="0.00000000" bU="0.71333518" cU="0.71325886" dU="-0.47601793" aV="0.00000000" bV="0.00000000" cV="-0.04912243" dV="0.01715231" pRange="normalized" />
             </geometry>
-            <geometry s="74.45116537" x="1648.30155392" y="1124.31710038" hdg="0.16109462" length="5.55620228">
-                <paramPoly3 aU="0.00000000" bU="4.16710155" cU="4.16771166" dU="-2.77876176" aV="0.00000000" bV="-0.00000000" cV="-0.00687518" dV="-0.02366727" pRange="normalized" />
+            <geometry s="74.44138128" x="1648.29171093" y="1124.31629713" hdg="0.16116091" length="5.55615914">
+                <paramPoly3 aU="0.00000000" bU="4.16706865" cU="4.16768807" dU="-2.77874861" aV="0.00000000" bV="0.00000000" cV="-0.00621037" dV="-0.02423700" pRange="normalized" />
             </geometry>
-            <geometry s="80.00736764" x="1653.79056625" y="1125.17813710" hdg="0.14075482" length="3.67467144">
-                <paramPoly3 aU="0.00000000" bU="2.75591600" cU="2.75473180" dU="-1.83701859" aV="0.00000000" bV="0.00000000" cV="-0.15372910" dV="0.07126404" pRange="normalized" />
+            <geometry s="79.99754042" x="1653.78060813" y="1125.17778463" hdg="0.14072985" length="3.68460245">
+                <paramPoly3 aU="0.00000000" bU="2.76336363" cU="2.76215557" dU="-1.84197083" aV="0.00000000" bV="0.00000000" cV="-0.15513618" dV="0.07206992" pRange="normalized" />
             </geometry>
-            <geometry s="83.68203909" x="1657.43943375" y="1125.61186290" hdg="0.10676099" length="5.55901787">
-                <paramPoly3 aU="0.00000000" bU="4.16923267" cU="4.16933491" dU="-2.77975269" aV="0.00000000" bV="0.00000000" cV="-0.05728446" dV="0.01484521" pRange="normalized" />
+            <geometry s="83.68214287" x="1657.43939187" y="1125.61221537" hdg="0.10668411" length="5.55902445">
+                <paramPoly3 aU="0.00000000" bU="4.16923777" cU="4.16933862" dU="-2.77975415" aV="0.00000000" bV="0.00000000" cV="-0.05724852" dV="0.01488173" pRange="normalized" />
             </geometry>
-            <geometry s="89.24105695" x="1662.97112154" y="1126.16200314" hdg="0.08996256" length="5.08401663">
-                <paramPoly3 aU="0.00000000" bU="3.81299521" cU="3.81224571" dU="-2.54150253" aV="0.00000000" bV="0.00000000" cV="-0.14171898" dV="0.09077725" pRange="normalized" />
+            <geometry s="89.24116732" x="1662.97112154" y="1126.16200314" hdg="0.08992922" length="5.08401652">
+                <paramPoly3 aU="0.00000000" bU="3.81299521" cU="3.81225043" dU="-2.54150555" aV="0.00000000" bV="0.00000000" cV="-0.14133764" dV="0.09056539" pRange="normalized" />
             </geometry>
-            <geometry s="94.32507359" x="1668.03887846" y="1126.56799686" hdg="0.08704982" length="5.55954783">
+            <geometry s="94.32518384" x="1668.03887846" y="1126.56799686" hdg="0.08704982" length="5.55954783">
                 <paramPoly3 aU="0.00000000" bU="4.16961397" cU="4.17010449" dU="-2.78035059" aV="0.00000000" bV="0.00000000" cV="0.02457086" dV="0.01156310" pRange="normalized" />
             </geometry>
-            <geometry s="99.88462142" x="1673.57405460" y="1127.08732504" hdg="0.10715640" length="25.66912263">
+            <geometry s="99.88473168" x="1673.57405460" y="1127.08732504" hdg="0.10715640" length="25.66912263">
                 <line />
             </geometry>
-            <geometry s="125.55374405" x="1699.09594540" y="1129.83267496" hdg="0.10715640" length="5.55982804">
+            <geometry s="125.55385430" x="1699.09594540" y="1129.83267496" hdg="0.10715640" length="5.55982804">
                 <paramPoly3 aU="0.00000000" bU="4.16983717" cU="4.16983716" dU="-2.78010853" aV="0.00000000" bV="0.00000000" cV="0.07370067" dV="-0.02456881" pRange="normalized" />
             </geometry>
-            <geometry s="131.11357209" x="1704.61836817" y="1130.47612865" hdg="0.12483066" length="33.55435798">
+            <geometry s="131.11368235" x="1704.61836817" y="1130.47612865" hdg="0.12483066" length="33.55435798">
                 <line />
             </geometry>
-            <geometry s="164.66793007" x="1737.91163183" y="1134.65387135" hdg="0.12483066" length="5.55843325">
+            <geometry s="164.66804032" x="1737.91163183" y="1134.65387135" hdg="0.12483066" length="5.55843325">
                 <paramPoly3 aU="0.00000000" bU="4.16851661" cU="4.16851555" dU="-2.78098717" aV="0.00000000" bV="0.00000000" cV="0.22243475" dV="-0.07419765" pRange="normalized" />
             </geometry>
-            <geometry s="170.22636332" x="1743.40598742" y="1135.49271986" hdg="0.17817866" length="17.40355591">
+            <geometry s="170.22647358" x="1743.40598742" y="1135.49271986" hdg="0.17817866" length="17.40355591">
                 <line />
             </geometry>
-            <geometry s="187.62991923" x="1760.53401258" y="1138.57728014" hdg="0.17817866" length="5.55870245">
+            <geometry s="187.63002948" x="1760.53401258" y="1138.57728014" hdg="0.17817866" length="5.55870245">
                 <paramPoly3 aU="0.00000000" bU="4.16877146" cU="4.16877073" dU="-2.78081782" aV="0.00000000" bV="-0.00000000" cV="0.20243048" dV="-0.06751657" pRange="normalized" />
             </geometry>
-            <geometry s="193.18862168" x="1765.97885186" y="1139.69491726" hdg="0.22672791" length="15.57079743">
+            <geometry s="193.18873194" x="1765.97885186" y="1139.69491726" hdg="0.22672791" length="15.57079743">
                 <line />
             </geometry>
-            <geometry s="208.75941911" x="1781.15114814" y="1143.19508274" hdg="0.22672791" length="5.55941951">
+            <geometry s="208.75952937" x="1781.15114814" y="1143.19508274" hdg="0.22672791" length="5.55941951">
                 <paramPoly3 aU="0.00000000" bU="4.16945035" cU="4.16945020" dU="-2.78036619" aV="0.00000000" bV="0.00000000" cV="0.13540747" dV="-0.04514772" pRange="normalized" />
             </geometry>
-            <geometry s="214.31883862" x="1786.54713421" y="1144.53253754" hdg="0.25920115" length="28.93959174">
+            <geometry s="214.31894888" x="1786.54713421" y="1144.53253754" hdg="0.25920115" length="28.93959174">
                 <line />
             </geometry>
         </planView>
@@ -2691,23 +2683,23 @@
             <elevation s="48.36338238" a="-3.16753133" b="-0.00336382" c="-0.00047369" d="0.00006468" />
             <elevation s="53.92319243" a="-3.18976021" b="-0.00351087" c="0" d="0" />
             <elevation s="59.75639216" a="-3.21023979" b="-0.00263241" c="-0.00072778" d="0.00008002" />
-            <elevation s="65.30302129" a="-3.23357591" b="-0.00332065" c="-0.00167748" d="0.00041190" />
-            <elevation s="67.93441859" a="-3.24642409" b="-0.00359305" c="-0.00063130" d="0.00007629" />
-            <elevation s="73.49013038" a="-3.27278959" b="-0.00354318" c="-0.00348321" d="0.00248012" />
-            <elevation s="74.45116537" a="-3.27721041" b="-0.00336666" c="-0.00060522" d="0.00007322" />
-            <elevation s="80.00736764" a="-3.30204173" b="-0.00331124" c="-0.00088504" d="0.00016530" />
-            <elevation s="83.68203909" a="-3.31795827" b="-0.00311963" c="-0.00053354" d="0.00006602" />
-            <elevation s="89.24105695" a="-3.34044721" b="-0.00293125" c="-0.00048204" d="0.00006283" />
-            <elevation s="94.32507359" a="-3.35955279" b="-0.00296069" c="-0.00055380" d="0.00006208" />
-            <elevation s="99.88462142" a="-3.38246273" b="-0.00448299" c="0" d="0" />
-            <elevation s="125.55374405" a="-3.49753727" b="-0.00336222" c="-0.00055189" d="0.00006935" />
-            <elevation s="131.11357209" a="-3.52137178" b="-0.00409057" c="0" d="0" />
-            <elevation s="164.66793007" a="-3.65862822" b="-0.00306770" c="-0.00058835" d="0.00006843" />
-            <elevation s="170.22636332" a="-3.68210614" b="-0.00435473" c="0" d="0" />
-            <elevation s="187.62991923" a="-3.75789386" b="-0.00326584" c="-0.00057531" d="0.00006977" />
-            <elevation s="193.18862168" a="-3.78184054" b="-0.00425919" c="0" d="0" />
-            <elevation s="208.75941911" a="-3.84815946" b="-0.00319430" c="-0.00059572" d="0.00007019" />
-            <elevation s="214.31883862" a="-3.87227002" b="-0.00441368" c="0" d="0" />
+            <elevation s="65.30302129" a="-3.23357591" b="-0.00332065" c="-0.00167682" d="0.00041165" />
+            <elevation s="67.93441772" a="-3.24642409" b="-0.00359480" c="-0.00063197" d="0.00007635" />
+            <elevation s="73.49016118" a="-3.27280887" b="-0.00354628" c="-0.00353304" d="0.00254193" />
+            <elevation s="74.44138128" a="-3.27719113" b="-0.00336805" c="-0.00060553" d="0.00007328" />
+            <elevation s="79.99754042" a="-3.30202879" b="-0.00331032" c="-0.00087999" d="0.00016396" />
+            <elevation s="83.68214287" a="-3.31797121" b="-0.00311732" c="-0.00053328" d="0.00006597" />
+            <elevation s="89.24116732" a="-3.34044721" b="-0.00293033" c="-0.00048240" d="0.00006287" />
+            <elevation s="94.32518384" a="-3.35955279" b="-0.00296069" c="-0.00055380" d="0.00006208" />
+            <elevation s="99.88473168" a="-3.38246273" b="-0.00448299" c="0" d="0" />
+            <elevation s="125.55385430" a="-3.49753727" b="-0.00336222" c="-0.00055189" d="0.00006935" />
+            <elevation s="131.11368235" a="-3.52137178" b="-0.00409057" c="0" d="0" />
+            <elevation s="164.66804032" a="-3.65862822" b="-0.00306770" c="-0.00058835" d="0.00006843" />
+            <elevation s="170.22647358" a="-3.68210614" b="-0.00435473" c="0" d="0" />
+            <elevation s="187.63002948" a="-3.75789386" b="-0.00326584" c="-0.00057531" d="0.00006977" />
+            <elevation s="193.18873194" a="-3.78184054" b="-0.00425919" c="0" d="0" />
+            <elevation s="208.75952937" a="-3.84815946" b="-0.00319430" c="-0.00059572" d="0.00007019" />
+            <elevation s="214.31894888" a="-3.87227002" b="-0.00441368" c="0" d="0" />
         </elevationProfile>
         <lateralProfile />
         <lanes>
@@ -2720,7 +2712,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="2.00" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -2734,7 +2726,7 @@
     <road name="Valldavägen" length="46.76688742" id="562" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="1" />
-        </link>
+        <successor elementType="road" elementId="629" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1389.64691792" y="857.55930056" hdg="2.61738397" length="4.09707151">
@@ -2785,7 +2777,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -3120,7 +3112,7 @@
     <road name="" length="18.40617849" id="569" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="6" />
-        </link>
+        <successor elementType="road" elementId="525" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1245.80393693" y="1064.09216105" hdg="-1.09389618" length="9.36756023">
@@ -3147,7 +3139,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -3160,9 +3152,8 @@
     </road>
     <road name="" length="194.68386606" id="570" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="35" />
             <successor elementType="junction" elementId="9" />
-        </link>
+        <predecessor elementType="road" elementId="526" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1305.18000000" y="1324.67000000" hdg="-0.23840599" length="12.91530100">
@@ -3255,7 +3246,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -4240,7 +4231,7 @@
     <road name="Säröleden" length="66.23727430" id="590" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="20" />
-        </link>
+        <successor elementType="road" elementId="538" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1750.18178565" y="1147.35990261" hdg="0.19451460" length="15.99312248">
@@ -4273,7 +4264,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="19.44" />
@@ -5218,7 +5209,7 @@
     <road name="" length="281.48235343" id="609" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="9" />
-        </link>
+        <successor elementType="road" elementId="542" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1401.10662316" y="1188.40116429" hdg="2.60382056" length="4.71444976">
@@ -5335,7 +5326,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="2.00" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -5495,7 +5486,7 @@
     <road name="" length="59.93307358" id="612" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="16" />
-        </link>
+        <successor elementType="road" elementId="533" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1537.50269009" y="1070.86605390" hdg="0.59885994" length="8.89985165">
@@ -5556,7 +5547,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -5784,9 +5775,8 @@
     </road>
     <road name="" length="110.67807261" id="616" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="47" />
             <successor elementType="junction" elementId="12" />
-        </link>
+        <predecessor elementType="road" elementId="548" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1150.84000000" y="1278.61000000" hdg="-0.66547874" length="0.49981886">
@@ -5831,7 +5821,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="13.89" />
@@ -5844,9 +5834,8 @@
     </road>
     <road name="Säröleden" length="277.92176262" id="617" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="48" />
             <successor elementType="junction" elementId="10" />
-        </link>
+        <predecessor elementType="road" elementId="529" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1150.84000000" y="1299.92000000" hdg="-0.60156766" length="7.49635644">
@@ -5909,7 +5898,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="22.22" />
@@ -5922,9 +5911,8 @@
     </road>
     <road name="Hönsarydsliden" length="127.75063888" id="618" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="49" />
             <successor elementType="junction" elementId="28" />
-        </link>
+        <predecessor elementType="road" elementId="549" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1814.52000000" y="1196.62000000" hdg="-2.88282176" length="16.97128734">
@@ -5969,7 +5957,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="driving" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="13.89" />
@@ -6040,7 +6028,7 @@
         <signals />
         <userData code="sumoId" value="350844236#0" />
     </road>
-    <road name="" length="57.33304520" id="620" junction="-1">
+    <road name="" length="57.33216929" id="620" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="16" />
             <successor elementType="junction" elementId="27" />
@@ -6059,19 +6047,19 @@
             <geometry s="26.48128607" x="1516.56831145" y="1045.67455330" hdg="-2.47699078" length="5.52701860">
                 <paramPoly3 aU="-0.00000000" bU="4.14261483" cU="4.07608810" dU="-2.73149026" aV="0.00000000" bV="0.00000000" cV="1.30549174" dV="-0.67351109" pRange="normalized" />
             </geometry>
-            <geometry s="32.00830466" x="1512.63875541" y="1041.79286658" hdg="-2.33397293" length="1.81684116">
-                <paramPoly3 aU="-0.00000000" bU="1.36207748" cU="1.35130257" dU="-0.90403831" aV="0.00000000" bV="0.00000000" cV="0.30903275" dV="-0.15246428" pRange="normalized" />
+            <geometry s="32.00830466" x="1512.63875541" y="1041.79286658" hdg="-2.33397293" length="1.81683933">
+                <paramPoly3 aU="-0.00000000" bU="1.36207748" cU="1.35126682" dU="-0.90400256" aV="0.00000000" bV="0.00000000" cV="0.30933398" dV="-0.15276551" pRange="normalized" />
             </geometry>
-            <geometry s="33.82514582" x="1511.50124459" y="1040.37713342" hdg="-2.21573617" length="5.55549958">
-                <paramPoly3 aU="-0.00000000" bU="4.16626073" cU="4.17115655" dU="-2.78270533" aV="0.00000000" bV="-0.00000000" cV="-0.04594393" dV="0.10390120" pRange="normalized" />
+            <geometry s="33.82514399" x="1511.50124459" y="1040.37713342" hdg="-2.21595888" length="5.55556218">
+                <paramPoly3 aU="-0.00000000" bU="4.16631274" cU="4.17114053" dU="-2.78266776" aV="0.00000000" bV="-0.00000000" cV="-0.04562619" dV="0.10317920" pRange="normalized" />
             </geometry>
-            <geometry s="39.38064540" x="1508.20834321" y="1035.90332247" hdg="-2.16295075" length="8.46848887">
+            <geometry s="39.38070617" x="1508.20697970" y="1035.90424027" hdg="-2.16354198" length="8.47407282">
                 <line />
             </geometry>
-            <geometry s="47.84913427" x="1503.48165679" y="1028.87667753" hdg="-2.16295075" length="5.55422965">
-                <paramPoly3 aU="-0.00000000" bU="4.16453849" cU="4.16452421" dU="-2.78361718" aV="0.00000000" bV="-0.00000000" cV="0.42670357" dV="-0.14260661" pRange="normalized" />
+            <geometry s="47.85477900" x="1503.47302030" y="1028.87575973" hdg="-2.16354198" length="5.55406321">
+                <paramPoly3 aU="-0.00000000" bU="4.16438103" cU="4.16436591" dU="-2.78372076" aV="0.00000000" bV="-0.00000000" cV="0.43280691" dV="-0.14465725" pRange="normalized" />
             </geometry>
-            <geometry s="53.40336393" x="1500.62219344" y="1024.11683022" hdg="-2.06057888" length="3.92968127">
+            <geometry s="53.40884220" x="1500.61433889" y="1024.11568766" hdg="-2.05970452" length="3.92332708">
                 <line />
             </geometry>
         </planView>
@@ -6080,11 +6068,11 @@
             <elevation s="5.53291505" a="-0.23246142" b="0.00066404" c="0.00000002" d="-0.00000716" />
             <elevation s="11.09262262" a="-0.23000000" b="0.00000000" c="0" d="0" />
             <elevation s="26.48128607" a="-0.23000000" b="0.00000000" c="0.00025486" d="-0.00002379" />
-            <elevation s="32.00830466" a="-0.22623107" b="0.00063725" c="0.00118733" d="-0.00043602" />
-            <elevation s="33.82514582" a="-0.22376893" b="0.00063405" c="0.00013809" d="-0.00002342" />
-            <elevation s="39.38064540" a="-0.22000000" b="0.00000000" c="0" d="0" />
-            <elevation s="47.84913427" a="-0.22000000" b="0.00000000" c="0.00013439" d="-0.00000809" />
-            <elevation s="53.40336393" a="-0.21723971" b="0.00099291" c="0" d="0" />
+            <elevation s="32.00830466" a="-0.22623107" b="0.00063725" c="0.00118734" d="-0.00043602" />
+            <elevation s="33.82514399" a="-0.22376893" b="0.00063405" c="0.00013808" d="-0.00002342" />
+            <elevation s="39.38070617" a="-0.22000000" b="0.00000000" c="0" d="0" />
+            <elevation s="47.85477900" a="-0.22000000" b="0.00000000" c="0.00013447" d="-0.00000809" />
+            <elevation s="53.40884220" a="-0.21723831" b="0.00099341" c="0" d="0" />
         </elevationProfile>
         <lateralProfile />
         <lanes>
@@ -6247,7 +6235,7 @@
     <road name="" length="120.11162215" id="623" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="28" />
-        </link>
+        <successor elementType="road" elementId="556" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1684.71936925" y="1167.02599871" hdg="1.86175952" length="0.77335850">
@@ -6298,7 +6286,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -6312,7 +6300,7 @@
     <road name="" length="77.53661202" id="624" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="33" />
-        </link>
+        <successor elementType="road" elementId="557" contactPoint="start" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1674.76733317" y="1172.29622252" hdg="1.82387798" length="21.33185059">
@@ -6351,7 +6339,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><successor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -6472,9 +6460,8 @@
     </road>
     <road name="" length="35.78161928" id="626" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="50" />
             <successor elementType="junction" elementId="33" />
-        </link>
+        <predecessor elementType="road" elementId="559" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1635.38000000" y="1179.71000000" hdg="-0.36016174" length="16.57160200">
@@ -6507,7 +6494,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -6554,11 +6541,10 @@
         <signals />
         <userData code="sumoId" value="350975672#1" />
     </road>
-    <road name="" length="243.25843036" id="628" junction="-1">
+    <road name="" length="243.25854061" id="628" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="51" />
             <successor elementType="junction" elementId="22" />
-        </link>
+        <predecessor elementType="road" elementId="561" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1814.52000000" y="1151.95000000" hdg="-2.88239150" length="28.93959174">
@@ -6591,49 +6577,49 @@
             <geometry s="143.37380894" x="1673.57405460" y="1127.08732504" hdg="-3.03443625" length="5.55954783">
                 <paramPoly3 aU="-0.00000000" bU="4.16961397" cU="4.16891278" dU="-2.77955612" aV="0.00000000" bV="0.00000000" cV="-0.14310603" dV="0.06746034" pRange="normalized" />
             </geometry>
-            <geometry s="148.93335677" x="1668.03887846" y="1126.56799686" hdg="-3.05454283" length="5.08401663">
-                <paramPoly3 aU="-0.00000000" bU="3.81299521" cU="3.81262615" dU="-2.54175616" aV="0.00000000" bV="-0.00000000" cV="-0.11950812" dV="0.08337415" pRange="normalized" />
+            <geometry s="148.93335677" x="1668.03887846" y="1126.56799686" hdg="-3.05454283" length="5.08401652">
+                <paramPoly3 aU="-0.00000000" bU="3.81299521" cU="3.81262578" dU="-2.54175579" aV="0.00000000" bV="-0.00000000" cV="-0.11938099" dV="0.08324703" pRange="normalized" />
             </geometry>
-            <geometry s="154.01737340" x="1662.97112154" y="1126.16200314" hdg="-3.05163010" length="5.55901787">
-                <paramPoly3 aU="-0.00000000" bU="4.16923267" cU="4.16912066" dU="-2.77960986" aV="0.00000000" bV="0.00000000" cV="0.08279192" dV="-0.03185018" pRange="normalized" />
+            <geometry s="154.01737329" x="1662.97112154" y="1126.16200314" hdg="-3.05166344" length="5.55902445">
+                <paramPoly3 aU="-0.00000000" bU="4.16923777" cU="4.16912737" dU="-2.77961331" aV="0.00000000" bV="0.00000000" cV="0.08246490" dV="-0.03169265" pRange="normalized" />
             </geometry>
-            <geometry s="159.57639127" x="1657.43943375" y="1125.61186290" hdg="-3.03483166" length="3.67467144">
-                <paramPoly3 aU="-0.00000000" bU="2.75591600" cU="2.75677294" dU="-1.83837936" aV="0.00000000" bV="0.00000000" cV="0.03365165" dV="0.00878760" pRange="normalized" />
+            <geometry s="159.57639774" x="1657.43939187" y="1125.61221537" hdg="-3.03490855" length="3.68460245">
+                <paramPoly3 aU="-0.00000000" bU="2.76336363" cU="2.76423423" dU="-1.84335661" aV="0.00000000" bV="-0.00000000" cV="0.03303778" dV="0.00932901" pRange="normalized" />
             </geometry>
-            <geometry s="163.25106271" x="1653.79056625" y="1125.17813710" hdg="-3.00083783" length="5.55620228">
-                <paramPoly3 aU="-0.00000000" bU="4.16710155" cU="4.16612746" dU="-2.77770562" aV="0.00000000" bV="0.00000000" cV="0.16264301" dV="-0.08017795" pRange="normalized" />
+            <geometry s="163.26100019" x="1653.78060813" y="1125.17778463" hdg="-3.00086280" length="5.55615914">
+                <paramPoly3 aU="-0.00000000" bU="4.16706865" cU="4.16607542" dU="-2.77767351" aV="0.00000000" bV="0.00000000" cV="0.16406704" dV="-0.08100078" pRange="normalized" />
             </geometry>
-            <geometry s="168.80726499" x="1648.30155392" y="1124.31710038" hdg="-2.98049803" length="0.96103498">
-                <paramPoly3 aU="-0.00000000" bU="0.72069589" cU="0.72078405" dU="-0.48103759" aV="0.00000000" bV="0.00000000" cV="0.04446687" dV="-0.01392442" pRange="normalized" />
+            <geometry s="168.81715933" x="1648.29171093" y="1124.31629713" hdg="-2.98043174" length="0.95122010">
+                <paramPoly3 aU="-0.00000000" bU="0.71333518" cU="0.71340884" dU="-0.47611792" aV="0.00000000" bV="-0.00000000" cV="0.04455418" dV="-0.01410681" pRange="normalized" />
             </geometry>
-            <geometry s="169.76829997" x="1647.35844608" y="1124.13289962" hdg="-2.91501381" length="5.55571179">
-                <paramPoly3 aU="-0.00000000" bU="4.16674378" cU="4.16717595" dU="-2.77835567" aV="0.00000000" bV="0.00000000" cV="0.01992183" dV="0.01245006" pRange="normalized" />
+            <geometry s="169.76837943" x="1647.35828907" y="1124.13370287" hdg="-2.91479425" length="5.55574346">
+                <paramPoly3 aU="-0.00000000" bU="4.16676798" cU="4.16719793" dU="-2.77836726" aV="0.00000000" bV="-0.00000000" cV="0.01921474" dV="0.01275538" pRange="normalized" />
             </geometry>
-            <geometry s="175.32401177" x="1641.95215086" y="1122.85332470" hdg="-2.89648657" length="2.63139730">
-                <paramPoly3 aU="-0.00000000" bU="1.97323256" cU="1.97616893" dU="-1.31937101" aV="0.00000000" bV="0.00000000" cV="0.06081315" dV="0.00974389" pRange="normalized" />
+            <geometry s="175.32412289" x="1641.95215086" y="1122.85332470" hdg="-2.89638671" length="2.63139643">
+                <paramPoly3 aU="-0.00000000" bU="1.97323256" cU="1.97617497" dU="-1.31937002" aV="0.00000000" bV="0.00000000" cV="0.06022175" dV="0.01007267" pRange="normalized" />
             </geometry>
-            <geometry s="177.95540907" x="1639.41784914" y="1122.14667530" hdg="-2.81995970" length="5.54662913">
+            <geometry s="177.95551932" x="1639.41784914" y="1122.14667530" hdg="-2.81995970" length="5.54662913">
                 <paramPoly3 aU="-0.00000000" bU="4.15880795" cU="4.17367774" dU="-2.78894947" aV="0.00000000" bV="-0.00000000" cV="-0.01002406" dV="0.14074514" pRange="normalized" />
             </geometry>
-            <geometry s="183.50203820" x="1634.19990585" y="1120.27025591" hdg="-2.72310097" length="5.83319973">
+            <geometry s="183.50214846" x="1634.19990585" y="1120.27025591" hdg="-2.72310097" length="5.83319973">
                 <line />
             </geometry>
-            <geometry s="189.33523793" x="1628.87009415" y="1117.89974409" hdg="-2.72310097" length="5.55981005">
+            <geometry s="189.33534818" x="1628.87009415" y="1117.89974409" hdg="-2.72310097" length="5.55981005">
                 <paramPoly3 aU="-0.00000000" bU="4.16982014" cU="4.16982012" dU="-2.78011988" aV="0.00000000" bV="0.00000000" cV="0.07745989" dV="-0.02582219" pRange="normalized" />
             </geometry>
-            <geometry s="194.89504798" x="1623.81132875" y="1115.59326931" hdg="-2.70452519" length="12.27670653">
+            <geometry s="194.89515824" x="1623.81132875" y="1115.59326931" hdg="-2.70452519" length="12.27670653">
                 <line />
             </geometry>
-            <geometry s="207.17175452" x="1612.68867125" y="1110.39673069" hdg="-2.70452519" length="5.55886866">
+            <geometry s="207.17186477" x="1612.68867125" y="1110.39673069" hdg="-2.70452519" length="5.55886866">
                 <paramPoly3 aU="-0.00000000" bU="4.16892881" cU="4.16892826" dU="-2.78071321" aV="0.00000000" bV="0.00000000" cV="0.18902461" dV="-0.06304057" pRange="normalized" />
             </geometry>
-            <geometry s="212.73062317" x="1607.70724348" y="1107.93033712" hdg="-2.65919166" length="24.48909316">
+            <geometry s="212.73073343" x="1607.70724348" y="1107.93033712" hdg="-2.65919166" length="24.48909316">
                 <line />
             </geometry>
-            <geometry s="237.21971634" x="1586.01275652" y="1096.56966288" hdg="-2.65919166" length="5.55406408">
+            <geometry s="237.21982659" x="1586.01275652" y="1096.56966288" hdg="-2.65919166" length="5.55406408">
                 <paramPoly3 aU="-0.00000000" bU="4.16438186" cU="4.16436674" dU="-2.78372022" aV="0.00000000" bV="-0.00000000" cV="0.43277510" dV="-0.14464656" pRange="normalized" />
             </geometry>
-            <geometry s="242.77378042" x="1581.23417159" y="1093.74203420" hdg="-2.55536184" length="0.48464994">
+            <geometry s="242.77389068" x="1581.23417159" y="1093.74203420" hdg="-2.55536184" length="0.48464994">
                 <line />
             </geometry>
         </planView>
@@ -6648,21 +6634,21 @@
             <elevation s="112.14485827" a="-3.52137178" b="0.00306790" c="0.00060482" d="-0.00006935" />
             <elevation s="117.70468631" a="-3.49753727" b="0.00448299" c="0" d="0" />
             <elevation s="143.37380894" a="-3.38246273" b="0.00336221" c="0.00048158" d="-0.00006208" />
-            <elevation s="148.93335677" a="-3.35955279" b="0.00296071" c="0.00047625" d="-0.00006283" />
-            <elevation s="154.01737340" a="-3.34044721" b="0.00293124" c="0.00056743" d="-0.00006602" />
-            <elevation s="159.57639127" a="-3.31795827" b="0.00311955" c="0.00093720" d="-0.00016530" />
-            <elevation s="163.25106271" a="-3.30204173" b="0.00331130" c="0.00061518" d="-0.00007322" />
-            <elevation s="168.80726499" a="-3.27721041" b="0.00336633" c="0.00366724" d="-0.00248012" />
-            <elevation s="169.76829997" a="-3.27278959" b="0.00354354" c="0.00064021" d="-0.00007629" />
-            <elevation s="175.32401177" a="-3.24642409" b="0.00359251" c="0.00157417" d="-0.00041190" />
-            <elevation s="177.95540907" a="-3.23357591" b="0.00332025" c="0.00060377" d="-0.00008002" />
-            <elevation s="183.50203820" a="-3.21023979" b="0.00351087" c="0" d="0" />
-            <elevation s="189.33523793" a="-3.18976021" b="0.00263313" c="0.00060512" d="-0.00006468" />
-            <elevation s="194.89504798" a="-3.16753133" b="0.00448513" c="0" d="0" />
-            <elevation s="207.17175452" a="-3.11246867" b="0.00336367" c="0.00058428" d="-0.00007136" />
-            <elevation s="212.73062317" a="-3.08797301" b="0.00432625" c="0" d="0" />
-            <elevation s="237.21971634" a="-2.98202699" b="0.00324378" c="0.00052520" d="-0.00006675" />
-            <elevation s="242.77378042" a="-2.95924614" b="0.00386829" c="0" d="0" />
+            <elevation s="148.93335677" a="-3.35955279" b="0.00296071" c="0.00047643" d="-0.00006287" />
+            <elevation s="154.01737329" a="-3.34044721" b="0.00293033" c="0.00056692" d="-0.00006597" />
+            <elevation s="159.57639774" a="-3.31797121" b="0.00311724" c="0.00093239" d="-0.00016396" />
+            <elevation s="163.26100019" a="-3.30202879" b="0.00331038" c="0.00061590" d="-0.00007328" />
+            <elevation s="168.81715933" a="-3.27719113" b="0.00336771" c="0.00372076" d="-0.00254193" />
+            <elevation s="169.76837943" a="-3.27280887" b="0.00354664" c="0.00064064" d="-0.00007635" />
+            <elevation s="175.32412289" a="-3.24642409" b="0.00359426" c="0.00157284" d="-0.00041165" />
+            <elevation s="177.95551932" a="-3.23357591" b="0.00332025" c="0.00060377" d="-0.00008002" />
+            <elevation s="183.50214846" a="-3.21023979" b="0.00351087" c="0" d="0" />
+            <elevation s="189.33534818" a="-3.18976021" b="0.00263313" c="0.00060512" d="-0.00006468" />
+            <elevation s="194.89515824" a="-3.16753133" b="0.00448513" c="0" d="0" />
+            <elevation s="207.17186477" a="-3.11246867" b="0.00336367" c="0.00058428" d="-0.00007136" />
+            <elevation s="212.73073343" a="-3.08797301" b="0.00432625" c="0" d="0" />
+            <elevation s="237.21982659" a="-2.98202699" b="0.00324378" c="0.00052520" d="-0.00006675" />
+            <elevation s="242.77389068" a="-2.95924614" b="0.00386829" c="0" d="0" />
         </elevationProfile>
         <lateralProfile />
         <lanes>
@@ -6675,7 +6661,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="2.00" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -6688,9 +6674,8 @@
     </road>
     <road name="Valldavägen" length="46.76688733" id="629" junction="-1">
         <link>
-            <predecessor elementType="junction" elementId="52" />
             <successor elementType="junction" elementId="1" />
-        </link>
+        <predecessor elementType="road" elementId="562" contactPoint="end" /></link>
         <type s="0" type="town" />
         <planView>
             <geometry s="0.00000000" x="1352.15127113" y="839.04072454" hdg="1.04213630" length="4.57309246">
@@ -6741,7 +6726,7 @@
                 </center>
                 <right>
                     <lane id="-1" type="restricted" level="true">
-                        <link />
+                        <link><predecessor id="-1" /></link>
                         <width sOffset="0" a="3.50" b="0" c="0" d="0" />
                         <roadMark sOffset="0" type="solid" weight="standard" color="standard" width="0.13" />
                         <speed sOffset="0" max="5.56" />
@@ -8235,19 +8220,19 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-269_0" length="5.70087418" id="669" junction="27">
+    <road name=":-269_0" length="5.70093423" id="669" junction="27">
         <link>
             <predecessor elementType="road" elementId="620" contactPoint="end" />
             <successor elementType="road" elementId="613" contactPoint="start" />
         </link>
         <type s="0" type="town" />
         <planView>
-            <geometry s="0.00000000" x="1498.77353770" y="1020.64914124" hdg="-2.06057888" length="5.70087418">
-                <paramPoly3 aU="-0.00000000" bU="6.77475542" cU="-3.18269586" dU="0.00000000" aV="0.00000000" bV="0.00000000" cV="-3.52953133" dV="0.00000000" pRange="normalized" />
+            <geometry s="0.00000000" x="1498.77170019" y="1020.65199339" hdg="-2.05970452" length="5.70093423">
+                <paramPoly3 aU="-0.00000000" bU="6.77806282" cU="-3.18743572" dU="0.00000000" aV="0.00000000" bV="0.00000000" cV="-3.52970895" dV="0.00000000" pRange="normalized" />
             </geometry>
         </planView>
         <elevationProfile>
-            <elevation s="0.00000000" a="-0.21333788" b="0.00101916" c="0.00111456" d="0.00000000" />
+            <elevation s="0.00000000" a="-0.21334082" b="0.00102025" c="0.00111443" d="0.00000000" />
         </elevationProfile>
         <lateralProfile />
         <lanes>
@@ -8273,19 +8258,19 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-269_1" length="6.92233311" id="670" junction="27">
+    <road name=":-269_1" length="6.92400837" id="670" junction="27">
         <link>
             <predecessor elementType="road" elementId="620" contactPoint="end" />
             <successor elementType="road" elementId="621" contactPoint="start" />
         </link>
         <type s="0" type="town" />
         <planView>
-            <geometry s="0.00000000" x="1498.77353770" y="1020.64914124" hdg="-2.06057888" length="6.92233311">
-                <paramPoly3 aU="-0.00000000" bU="10.38214587" cU="-10.37810336" dU="6.91591844" aV="0.00000000" bV="0.00000000" cV="0.00904599" dV="0.13357821" pRange="normalized" />
+            <geometry s="0.00000000" x="1498.77170019" y="1020.65199339" hdg="-2.05970452" length="6.92400837">
+                <paramPoly3 aU="-0.00000000" bU="10.38471648" cU="-10.38084424" dU="6.91786577" aV="0.00000000" bV="0.00000000" cV="0.00874862" dV="0.13078677" pRange="normalized" />
             </geometry>
         </planView>
         <elevationProfile>
-            <elevation s="0.00000000" a="-0.21333788" b="0.00148917" c="-0.00021483" d="0.00002415" />
+            <elevation s="0.00000000" a="-0.21334082" b="0.00148994" c="-0.00021494" d="0.00002415" />
         </elevationProfile>
         <lateralProfile />
         <lanes>
@@ -8311,19 +8296,19 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-269_2" length="6.92233311" id="671" junction="27">
+    <road name=":-269_2" length="6.92400837" id="671" junction="27">
         <link>
             <predecessor elementType="road" elementId="554" contactPoint="end" />
             <successor elementType="road" elementId="553" contactPoint="start" />
         </link>
         <type s="0" type="town" />
         <planView>
-            <geometry s="0.00000000" x="1495.64400929" y="1014.47562901" hdg="1.12136577" length="6.92233311">
-                <paramPoly3 aU="0.00000000" bU="10.38214587" cU="-10.37774173" dU="6.91567735" aV="0.00000000" bV="0.00000000" cV="0.00887554" dV="-0.14552590" pRange="normalized" />
+            <geometry s="0.00000000" x="1495.64400929" y="1014.47562901" hdg="1.12136577" length="6.92400837">
+                <paramPoly3 aU="0.00000000" bU="10.38471648" cU="-10.38050197" dU="6.91763760" aV="0.00000000" bV="0.00000000" cV="0.00858898" dV="-0.14234518" pRange="normalized" />
             </geometry>
         </planView>
         <elevationProfile>
-            <elevation s="0.00000000" a="-0.20532050" b="-0.00198683" c="0.00028399" d="-0.00002384" />
+            <elevation s="0.00000000" a="-0.20532050" b="-0.00198685" c="0.00028393" d="-0.00002383" />
         </elevationProfile>
         <lateralProfile />
         <lanes>
@@ -8425,19 +8410,19 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-269_5" length="5.70087418" id="674" junction="27">
+    <road name=":-269_5" length="5.70093423" id="674" junction="27">
         <link>
             <predecessor elementType="road" elementId="545" contactPoint="end" />
             <successor elementType="road" elementId="553" contactPoint="start" />
         </link>
         <type s="0" type="town" />
         <planView>
-            <geometry s="0.00000000" x="1493.96912810" y="1019.13979314" hdg="-0.43185620" length="5.70087418">
-                <paramPoly3 aU="0.00000000" bU="7.07092245" cU="-3.33935252" dU="0.00000000" aV="0.00000000" bV="0.00000000" cV="3.38169619" dV="0.00000000" pRange="normalized" />
+            <geometry s="0.00000000" x="1493.96912810" y="1019.13979314" hdg="-0.43185620" length="5.70093423">
+                <paramPoly3 aU="0.00000000" bU="7.07092245" cU="-3.34221512" dU="0.00000000" aV="0.00000000" bV="0.00000000" cV="3.38351738" dV="0.00000000" pRange="normalized" />
             </geometry>
         </planView>
         <elevationProfile>
-            <elevation s="0.00000000" a="-0.17050951" b="-0.01369917" c="0.00108415" d="0.00000000" />
+            <elevation s="0.00000000" a="-0.17050951" b="-0.01369910" c="0.00108403" d="0.00000000" />
         </elevationProfile>
         <lateralProfile />
         <lanes>
@@ -9071,7 +9056,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-589_0" length="8.32062240" id="691" junction="1">
+    <road name=":-588_0" length="8.32062240" id="691" junction="1">
         <link>
             <predecessor elementType="road" elementId="521" contactPoint="end" />
             <successor elementType="road" elementId="562" contactPoint="start" />
@@ -9109,7 +9094,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-589_1" length="10.13287236" id="692" junction="1">
+    <road name=":-588_1" length="10.13287236" id="692" junction="1">
         <link>
             <predecessor elementType="road" elementId="521" contactPoint="end" />
             <successor elementType="road" elementId="520" contactPoint="start" />
@@ -9147,7 +9132,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-589_2" length="10.13284770" id="693" junction="1">
+    <road name=":-588_2" length="10.13284770" id="693" junction="1">
         <link>
             <predecessor elementType="road" elementId="564" contactPoint="end" />
             <successor elementType="road" elementId="565" contactPoint="start" />
@@ -9185,7 +9170,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-589_3" length="8.14946674" id="694" junction="1">
+    <road name=":-588_3" length="8.14946674" id="694" junction="1">
         <link>
             <predecessor elementType="road" elementId="564" contactPoint="end" />
             <successor elementType="road" elementId="562" contactPoint="start" />
@@ -9223,7 +9208,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-589_4" length="8.15130270" id="695" junction="1">
+    <road name=":-588_4" length="8.15130270" id="695" junction="1">
         <link>
             <predecessor elementType="road" elementId="629" contactPoint="end" />
             <successor elementType="road" elementId="520" contactPoint="start" />
@@ -9261,7 +9246,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-589_5" length="8.32062233" id="696" junction="1">
+    <road name=":-588_5" length="8.32062233" id="696" junction="1">
         <link>
             <predecessor elementType="road" elementId="629" contactPoint="end" />
             <successor elementType="road" elementId="565" contactPoint="start" />
@@ -9489,7 +9474,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-645_0" length="10.36777439" id="702" junction="6">
+    <road name=":-644_0" length="10.36777439" id="702" junction="6">
         <link>
             <predecessor elementType="road" elementId="523" contactPoint="end" />
             <successor elementType="road" elementId="524" contactPoint="start" />
@@ -9527,7 +9512,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-645_1" length="11.06844227" id="703" junction="6">
+    <road name=":-644_1" length="11.06844227" id="703" junction="6">
         <link>
             <predecessor elementType="road" elementId="523" contactPoint="end" />
             <successor elementType="road" elementId="569" contactPoint="start" />
@@ -9565,7 +9550,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-645_2" length="11.06844227" id="704" junction="6">
+    <road name=":-644_2" length="11.06844227" id="704" junction="6">
         <link>
             <predecessor elementType="road" elementId="525" contactPoint="end" />
             <successor elementType="road" elementId="567" contactPoint="start" />
@@ -9603,7 +9588,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-645_3" length="11.81405177" id="705" junction="6">
+    <road name=":-644_3" length="11.81405177" id="705" junction="6">
         <link>
             <predecessor elementType="road" elementId="525" contactPoint="end" />
             <successor elementType="road" elementId="524" contactPoint="start" />
@@ -9641,7 +9626,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-645_4" length="11.81405177" id="706" junction="6">
+    <road name=":-644_4" length="11.81405177" id="706" junction="6">
         <link>
             <predecessor elementType="road" elementId="568" contactPoint="end" />
             <successor elementType="road" elementId="569" contactPoint="start" />
@@ -9679,7 +9664,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-645_5" length="10.36777439" id="707" junction="6">
+    <road name=":-644_5" length="10.36777439" id="707" junction="6">
         <link>
             <predecessor elementType="road" elementId="568" contactPoint="end" />
             <successor elementType="road" elementId="567" contactPoint="start" />
@@ -9717,7 +9702,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-681_0" length="8.41810052" id="708" junction="10">
+    <road name=":-680_0" length="8.41810052" id="708" junction="10">
         <link>
             <predecessor elementType="road" elementId="571" contactPoint="end" />
             <successor elementType="road" elementId="529" contactPoint="start" />
@@ -9755,7 +9740,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-681_1" length="8.32926116" id="709" junction="10">
+    <road name=":-680_1" length="8.32926116" id="709" junction="10">
         <link>
             <predecessor elementType="road" elementId="571" contactPoint="end" />
             <successor elementType="road" elementId="573" contactPoint="start" />
@@ -9793,7 +9778,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-681_2" length="8.32926116" id="710" junction="10">
+    <road name=":-680_2" length="8.32926116" id="710" junction="10">
         <link>
             <predecessor elementType="road" elementId="530" contactPoint="end" />
             <successor elementType="road" elementId="527" contactPoint="start" />
@@ -9831,7 +9816,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-681_3" length="10.07802644" id="711" junction="10">
+    <road name=":-680_3" length="10.07802644" id="711" junction="10">
         <link>
             <predecessor elementType="road" elementId="530" contactPoint="end" />
             <successor elementType="road" elementId="529" contactPoint="start" />
@@ -9869,7 +9854,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-681_4" length="10.07802643" id="712" junction="10">
+    <road name=":-680_4" length="10.07802643" id="712" junction="10">
         <link>
             <predecessor elementType="road" elementId="617" contactPoint="end" />
             <successor elementType="road" elementId="573" contactPoint="start" />
@@ -9907,7 +9892,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-681_5" length="8.41809989" id="713" junction="10">
+    <road name=":-680_5" length="8.41809989" id="713" junction="10">
         <link>
             <predecessor elementType="road" elementId="617" contactPoint="end" />
             <successor elementType="road" elementId="527" contactPoint="start" />
@@ -13745,7 +13730,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_0" length="8.74604176" id="814" junction="3">
+    <road name=":cluster_-330_-638_-731_0" length="8.74604176" id="814" junction="3">
         <link>
             <predecessor elementType="road" elementId="621" contactPoint="end" />
             <successor elementType="road" elementId="566" contactPoint="start" />
@@ -13783,7 +13768,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_1" length="63.63332175" id="815" junction="3">
+    <road name=":cluster_-330_-638_-731_1" length="63.63332175" id="815" junction="3">
         <link>
             <predecessor elementType="road" elementId="621" contactPoint="end" />
             <successor elementType="road" elementId="532" contactPoint="start" />
@@ -13821,7 +13806,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_2" length="9.99503691" id="816" junction="3">
+    <road name=":cluster_-330_-638_-731_2" length="9.99503691" id="816" junction="3">
         <link>
             <predecessor elementType="road" elementId="621" contactPoint="end" />
             <successor elementType="road" elementId="521" contactPoint="start" />
@@ -13859,7 +13844,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_3" length="5.60163703" id="817" junction="3">
+    <road name=":cluster_-330_-638_-731_3" length="5.60163703" id="817" junction="3">
         <link>
             <predecessor elementType="road" elementId="621" contactPoint="end" />
             <successor elementType="road" elementId="622" contactPoint="start" />
@@ -13897,7 +13882,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_4" length="10.45803855" id="818" junction="3">
+    <road name=":cluster_-330_-638_-731_4" length="10.45803855" id="818" junction="3">
         <link>
             <predecessor elementType="road" elementId="621" contactPoint="end" />
             <successor elementType="road" elementId="575" contactPoint="start" />
@@ -13935,7 +13920,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_5" length="10.45803855" id="819" junction="3">
+    <road name=":cluster_-330_-638_-731_5" length="10.45803855" id="819" junction="3">
         <link>
             <predecessor elementType="road" elementId="531" contactPoint="end" />
             <successor elementType="road" elementId="554" contactPoint="start" />
@@ -13973,7 +13958,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_6" length="18.64715361" id="820" junction="3">
+    <road name=":cluster_-330_-638_-731_6" length="18.64715361" id="820" junction="3">
         <link>
             <predecessor elementType="road" elementId="531" contactPoint="end" />
             <successor elementType="road" elementId="566" contactPoint="start" />
@@ -14011,7 +13996,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_7" length="4.44271263" id="821" junction="3">
+    <road name=":cluster_-330_-638_-731_7" length="4.44271263" id="821" junction="3">
         <link>
             <predecessor elementType="road" elementId="531" contactPoint="end" />
             <successor elementType="road" elementId="532" contactPoint="start" />
@@ -14049,7 +14034,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_8" length="18.06555008" id="822" junction="3">
+    <road name=":cluster_-330_-638_-731_8" length="18.06555008" id="822" junction="3">
         <link>
             <predecessor elementType="road" elementId="531" contactPoint="end" />
             <successor elementType="road" elementId="521" contactPoint="start" />
@@ -14087,7 +14072,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_9" length="9.21047014" id="823" junction="3">
+    <road name=":cluster_-330_-638_-731_9" length="9.21047014" id="823" junction="3">
         <link>
             <predecessor elementType="road" elementId="531" contactPoint="end" />
             <successor elementType="road" elementId="622" contactPoint="start" />
@@ -14125,7 +14110,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_10" length="9.21049372" id="824" junction="3">
+    <road name=":cluster_-330_-638_-731_10" length="9.21049372" id="824" junction="3">
         <link>
             <predecessor elementType="road" elementId="555" contactPoint="end" />
             <successor elementType="road" elementId="575" contactPoint="start" />
@@ -14163,7 +14148,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_11" length="5.60163726" id="825" junction="3">
+    <road name=":cluster_-330_-638_-731_11" length="5.60163726" id="825" junction="3">
         <link>
             <predecessor elementType="road" elementId="555" contactPoint="end" />
             <successor elementType="road" elementId="554" contactPoint="start" />
@@ -14201,7 +14186,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_12" length="10.44586395" id="826" junction="3">
+    <road name=":cluster_-330_-638_-731_12" length="10.44586395" id="826" junction="3">
         <link>
             <predecessor elementType="road" elementId="555" contactPoint="end" />
             <successor elementType="road" elementId="566" contactPoint="start" />
@@ -14239,7 +14224,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_13" length="12.72187586" id="827" junction="3">
+    <road name=":cluster_-330_-638_-731_13" length="12.72187586" id="827" junction="3">
         <link>
             <predecessor elementType="road" elementId="555" contactPoint="end" />
             <successor elementType="road" elementId="532" contactPoint="start" />
@@ -14277,7 +14262,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_14" length="8.92702885" id="828" junction="3">
+    <road name=":cluster_-330_-638_-731_14" length="8.92702885" id="828" junction="3">
         <link>
             <predecessor elementType="road" elementId="555" contactPoint="end" />
             <successor elementType="road" elementId="521" contactPoint="start" />
@@ -14315,7 +14300,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_15" length="8.92705238" id="829" junction="3">
+    <road name=":cluster_-330_-638_-731_15" length="8.92705238" id="829" junction="3">
         <link>
             <predecessor elementType="road" elementId="565" contactPoint="end" />
             <successor elementType="road" elementId="622" contactPoint="start" />
@@ -14353,7 +14338,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_16" length="18.06555014" id="830" junction="3">
+    <road name=":cluster_-330_-638_-731_16" length="18.06555014" id="830" junction="3">
         <link>
             <predecessor elementType="road" elementId="565" contactPoint="end" />
             <successor elementType="road" elementId="575" contactPoint="start" />
@@ -14391,7 +14376,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_17" length="9.99503697" id="831" junction="3">
+    <road name=":cluster_-330_-638_-731_17" length="9.99503697" id="831" junction="3">
         <link>
             <predecessor elementType="road" elementId="565" contactPoint="end" />
             <successor elementType="road" elementId="554" contactPoint="start" />
@@ -14429,7 +14414,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_18" length="4.71790825" id="832" junction="3">
+    <road name=":cluster_-330_-638_-731_18" length="4.71790825" id="832" junction="3">
         <link>
             <predecessor elementType="road" elementId="565" contactPoint="end" />
             <successor elementType="road" elementId="566" contactPoint="start" />
@@ -14467,7 +14452,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_19" length="22.85483713" id="833" junction="3">
+    <road name=":cluster_-330_-638_-731_19" length="22.85483713" id="833" junction="3">
         <link>
             <predecessor elementType="road" elementId="565" contactPoint="end" />
             <successor elementType="road" elementId="532" contactPoint="start" />
@@ -14505,7 +14490,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_20" length="19.20737539" id="834" junction="3">
+    <road name=":cluster_-330_-638_-731_20" length="19.20737539" id="834" junction="3">
         <link>
             <predecessor elementType="road" elementId="574" contactPoint="end" />
             <successor elementType="road" elementId="521" contactPoint="start" />
@@ -14543,7 +14528,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_21" length="11.10218890" id="835" junction="3">
+    <road name=":cluster_-330_-638_-731_21" length="11.10218890" id="835" junction="3">
         <link>
             <predecessor elementType="road" elementId="574" contactPoint="end" />
             <successor elementType="road" elementId="622" contactPoint="start" />
@@ -14581,7 +14566,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_22" length="4.44271263" id="836" junction="3">
+    <road name=":cluster_-330_-638_-731_22" length="4.44271263" id="836" junction="3">
         <link>
             <predecessor elementType="road" elementId="574" contactPoint="end" />
             <successor elementType="road" elementId="575" contactPoint="start" />
@@ -14619,7 +14604,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_23" length="63.63332175" id="837" junction="3">
+    <road name=":cluster_-330_-638_-731_23" length="63.63332175" id="837" junction="3">
         <link>
             <predecessor elementType="road" elementId="574" contactPoint="end" />
             <successor elementType="road" elementId="554" contactPoint="start" />
@@ -14657,7 +14642,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_24" length="18.67495095" id="838" junction="3">
+    <road name=":cluster_-330_-638_-731_24" length="18.67495095" id="838" junction="3">
         <link>
             <predecessor elementType="road" elementId="574" contactPoint="end" />
             <successor elementType="road" elementId="566" contactPoint="start" />
@@ -14695,7 +14680,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_25" length="18.67495095" id="839" junction="3">
+    <road name=":cluster_-330_-638_-731_25" length="18.67495095" id="839" junction="3">
         <link>
             <predecessor elementType="road" elementId="522" contactPoint="end" />
             <successor elementType="road" elementId="532" contactPoint="start" />
@@ -14733,7 +14718,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_26" length="4.71790825" id="840" junction="3">
+    <road name=":cluster_-330_-638_-731_26" length="4.71790825" id="840" junction="3">
         <link>
             <predecessor elementType="road" elementId="522" contactPoint="end" />
             <successor elementType="road" elementId="521" contactPoint="start" />
@@ -14771,7 +14756,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_27" length="10.44588368" id="841" junction="3">
+    <road name=":cluster_-330_-638_-731_27" length="10.44588368" id="841" junction="3">
         <link>
             <predecessor elementType="road" elementId="522" contactPoint="end" />
             <successor elementType="road" elementId="622" contactPoint="start" />
@@ -14809,7 +14794,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_28" length="18.64715361" id="842" junction="3">
+    <road name=":cluster_-330_-638_-731_28" length="18.64715361" id="842" junction="3">
         <link>
             <predecessor elementType="road" elementId="522" contactPoint="end" />
             <successor elementType="road" elementId="575" contactPoint="start" />
@@ -14847,7 +14832,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-330_-639_-732_29" length="8.74604176" id="843" junction="3">
+    <road name=":cluster_-330_-638_-731_29" length="8.74604176" id="843" junction="3">
         <link>
             <predecessor elementType="road" elementId="522" contactPoint="end" />
             <successor elementType="road" elementId="554" contactPoint="start" />
@@ -14885,7 +14870,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-335_-636_0" length="37.77718719" id="844" junction="2">
+    <road name=":cluster_-335_-635_0" length="37.77718719" id="844" junction="2">
         <link>
             <predecessor elementType="road" elementId="520" contactPoint="end" />
             <successor elementType="road" elementId="555" contactPoint="start" />
@@ -14923,7 +14908,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-335_-636_1" length="37.77746055" id="845" junction="2">
+    <road name=":cluster_-335_-635_1" length="37.77746055" id="845" junction="2">
         <link>
             <predecessor elementType="road" elementId="622" contactPoint="end" />
             <successor elementType="road" elementId="564" contactPoint="start" />
@@ -14961,7 +14946,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-734_-742_0" length="0.24236014" id="846" junction="14">
+    <road name=":cluster_-733_-741_0" length="0.24236014" id="846" junction="14">
         <link>
             <predecessor elementType="road" elementId="532" contactPoint="end" />
             <successor elementType="road" elementId="531" contactPoint="start" />
@@ -14999,7 +14984,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":cluster_-734_-742_1" length="0.24236014" id="847" junction="14">
+    <road name=":cluster_-733_-741_1" length="0.24236014" id="847" junction="14">
         <link>
             <predecessor elementType="road" elementId="575" contactPoint="end" />
             <successor elementType="road" elementId="574" contactPoint="start" />
@@ -15255,7 +15240,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-589" id="1">
+    <junction name="-588" id="1">
         <connection id="0" incomingRoad="521" connectingRoad="691" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -15294,7 +15279,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-645" id="6">
+    <junction name="-644" id="6">
         <connection id="0" incomingRoad="523" connectingRoad="702" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -15314,7 +15299,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-681" id="10">
+    <junction name="-680" id="10">
         <connection id="0" incomingRoad="571" connectingRoad="708" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -15658,7 +15643,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="cluster_-330_-639_-732" id="3">
+    <junction name="cluster_-330_-638_-731" id="3">
         <connection id="0" incomingRoad="621" connectingRoad="814" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -15750,7 +15735,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="cluster_-335_-636" id="2">
+    <junction name="cluster_-335_-635" id="2">
         <connection id="0" incomingRoad="520" connectingRoad="844" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -15758,7 +15743,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="cluster_-734_-742" id="14">
+    <junction name="cluster_-733_-741" id="14">
         <connection id="0" incomingRoad="532" connectingRoad="846" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>

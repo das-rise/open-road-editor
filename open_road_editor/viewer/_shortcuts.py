@@ -215,7 +215,8 @@ class _ShortcutsMixin:
             ),
         ):
             return
-        self._delete_selected_osm_segment()
+        if not self._delete_selected_osm_node() and not self._delete_selected_osm_sign_node():
+            self._delete_selected_osm_segment()
 
     def _open_keyboard_shortcuts_dialog(self):
         dialog = QDialog(self)

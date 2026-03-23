@@ -4,6 +4,7 @@ import copy
 import io
 import math
 import os
+import tempfile
 import threading
 import xml.etree.ElementTree as ET
 
@@ -112,14 +113,34 @@ class _OsmMixin:
         self.lbl_osm_status.setText('Loading...')
 
         path = self.osm_path
+        content = self._compose_current_osm_content()
+        if content is None:
+            content = self._osm_content
+
+        temp_osm_path = None
+        if content:
+            try:
+                fd, temp_osm_path = tempfile.mkstemp(suffix='.osm', prefix='refresh_osm_')
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                path = temp_osm_path
+            except Exception as exc:
+                print(f'refresh_osm temp file error: {exc}')
+                temp_osm_path = None
 
         def run():
             try:
                 ways, signs, tree = self._parse_osm(path)
-                self.osm_ways_ready.emit((ways, signs, tree))
+                self.osm_ways_ready.emit((ways, signs, tree, content if temp_osm_path else None))
             except Exception as exc:
                 print(f'refresh_osm error: {exc}')
                 self.osm_ways_ready.emit(([], [], None))
+            finally:
+                if temp_osm_path:
+                    try:
+                        os.unlink(temp_osm_path)
+                    except OSError:
+                        pass
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -264,6 +285,7 @@ class _OsmMixin:
         self._osm_node_tag_edits.clear()
         self._osm_created_ways.clear()
         self._osm_deleted_way_ids.clear()
+        self._osm_deleted_node_ids.clear()
 
         # Only reset the dirty flag if this is a fresh project/OSM load.
         # For a refresh (mark_dirty_after_load is False), keep the dirty flag
@@ -459,6 +481,7 @@ class _OsmMixin:
         self._osm_node_tag_edits.clear()
         self._osm_created_ways.clear()
         self._osm_deleted_way_ids.clear()
+        self._osm_deleted_node_ids.clear()
         self._osm_relation_edit_mode = {'preceding': False, 'succeeding': False}
         self._osm_relation_draft = {'preceding': None, 'succeeding': None}
         self._osm_tags_edit_mode = False
@@ -2053,6 +2076,25 @@ class _OsmMixin:
         item.setPen(highlight_pen)
         self._show_selected_osm_node_props()
 
+    def _delete_selected_osm_sign_node(self) -> bool:
+        """Delete the currently selected standalone/sign node (ghost node) via keyboard."""
+        if not self._osm_edit_enabled():
+            return False
+        item = getattr(self, '_osm_selected_sign_item', None)
+        if item is None:
+            return False
+        nid = item.data(2)
+        self._osm_sign_item_positions.pop(item, None)
+        self.scene.removeItem(item)
+        self._select_osm_sign_item(None)
+        if nid is not None:
+            self._osm_deleted_node_ids.add(str(nid))
+            self._osm_node_tag_edits.pop(str(nid), None)
+        self._mark_osm_dirty()
+        if hasattr(self, '_schedule_auto_xodr_refresh'):
+            self._schedule_auto_xodr_refresh()
+        return True
+
     def _on_osm_click(self, scene_pos) -> None:
         """Select / deselect an OSM road segment or sign node on click."""
         if not self.check_osm.isChecked() or self.spin_osm_alpha.value() <= 0.0:
@@ -2772,12 +2814,36 @@ class _OsmMixin:
         if len(meta[3]) <= 2:
             return False  # can't delete below 2 nodes
         idx = self._osm_dot_to_index[dot]
+        return self._delete_osm_node_by_index(item, meta, idx)
+
+    def _delete_selected_osm_node(self) -> bool:
+        """Delete the currently selected node (via keyboard shortcut)."""
+        if not self._osm_edit_enabled():
+            return False
+        if self._osm_selected_node_index is None:
+            return False
+        item = self._osm_selected_item
+        if item is None:
+            return False
+        meta = self._osm_item_meta.get(item)
+        if not meta:
+            return False
+        if len(meta[3]) <= 2:
+            return False
+        idx = int(self._osm_selected_node_index)
+        if not (0 <= idx < len(meta[6])):
+            return False
+        return self._delete_osm_node_by_index(item, meta, idx)
+
+    def _delete_osm_node_by_index(self, item, meta, idx: int) -> bool:
+        """Remove node at *idx* from *item*, push undo, persist."""
         removed_scene = meta[3].pop(idx)
         removed_latlon = meta[4].pop(idx)
         removed_nref = meta[6].pop(idx)
         self._osm_node_tag_edits.pop(str(removed_nref[0]), None)
         self._rebuild_osm_path(item)
         self._show_osm_node_dots(item)
+        self._set_osm_selected_node_index(None)
         # Undo entry
         self._osm_undo_stack.append(
             {

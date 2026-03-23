@@ -255,6 +255,7 @@ class OpenDriveViewer(
         self._osm_node_tag_edits: dict = {}  # node_id → {'tag': 'value', ...}
         self._osm_created_ways: dict = {}  # new_way_id → {'tags': {...}, 'node_coords': [...]}
         self._osm_deleted_way_ids: set = set()  # existing way IDs removed by merge
+        self._osm_deleted_node_ids: set = set()  # standalone node IDs explicitly deleted
         self._osm_dirty: bool = False  # True when OSM edits changed since last successful save
         self._osm_relation_edit_mode: dict = {'preceding': False, 'succeeding': False}
         self._osm_relation_draft: dict = {'preceding': None, 'succeeding': None}

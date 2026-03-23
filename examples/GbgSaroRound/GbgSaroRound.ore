@@ -9,8 +9,8 @@
     "node_info_height": 131,
     "segment_info_key_col_width": 145,
     "display_zoom_pct": 16384,
-    "viewport_center_x": 1081.5429687499995,
-    "viewport_center_y": 979.6142578124997,
+    "viewport_center_x": 1080.9326171875,
+    "viewport_center_y": 979.00390625,
     "settings": {
       "show_esri": true,
       "show_carla_bev": false,
@@ -80,8 +80,8 @@
       "bound_south": -836.38,
       "bound_east": 1814.52,
       "bound_west": -1150.84,
-      "splitter_map_w": 1191,
-      "splitter_right_w": 647
+      "splitter_map_w": 1196,
+      "splitter_right_w": 650
     },
     "carla_metadata": {
       "server_meta": null,
