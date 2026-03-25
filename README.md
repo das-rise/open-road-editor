@@ -86,4 +86,4 @@ Full argument reference:
 
 ## License
 
-GPL-3.0 — see [LICENSE](open_road_editor/external/ORBIT/LICENSE) for details.
+GPL-3.0 — see [LICENSE](./LICENSE) for details.
