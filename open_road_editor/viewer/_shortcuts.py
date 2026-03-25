@@ -246,6 +246,17 @@ class _ShortcutsMixin:
         node_move_info.setWordWrap(True)
         layout.addWidget(node_move_info)
 
+        coord_marker_info = QLabel(
+            'Coordinate marker: Alt+right-click and drag in the viewport to place a directional '
+            'marker. The start of the drag sets the position; the drag direction sets the '
+            'heading/yaw. The status bar shows Geo (lat, lon, heading\u00b0) and '
+            'CARLA (x, y in cm, yaw\u00b0) coordinates. A short click with no drag places a '
+            'marker without a direction. Click "Clear Marker" to remove it and resume live '
+            'cursor coordinate tracking.'
+        )
+        coord_marker_info.setWordWrap(True)
+        layout.addWidget(coord_marker_info)
+
         mouse_group = QGroupBox('Mouse + Keyboard Bindings (Right-click)')
         mouse_layout = QFormLayout(mouse_group)
         mouse_editors = {}

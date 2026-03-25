@@ -21,13 +21,17 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import (
     QBrush,
+    QColor,
     QCursor,
     QPen,
     QPixmap,
+    QPolygonF,
+    QTransform,
 )
 from PyQt6.QtWidgets import (
     QColorDialog,
     QFileDialog,
+    QGraphicsItem,
     QGraphicsRectItem,
     QGraphicsView,
     QMessageBox,
@@ -36,6 +40,108 @@ from PyQt6.QtWidgets import (
 
 from open_road_editor.constants import *  # noqa: F401,F403
 from open_road_editor.utils.map_context import MapContext
+
+
+class _CoordMarkerItem(QGraphicsItem):
+    """Fixed-size crosshair + circle marker placed on Alt+right-click."""
+
+    _OUTER = 12  # outer arm length in screen px
+    _GAP = 5  # gap from center to arm start in screen px
+    _CIRCLE_R = 3  # center circle radius in screen px
+
+    def boundingRect(self):
+        r = self._OUTER + 2
+        return QRectF(-r, -r, 2 * r, 2 * r)
+
+    def paint(self, painter, option, widget=None):
+        o, g, cr = self._OUTER, self._GAP, self._CIRCLE_R
+        pen = QPen(QColor(255, 80, 0))
+        pen.setWidth(2)
+        pen.setCosmetic(True)
+        painter.setPen(pen)
+        painter.setBrush(QBrush())  # no fill
+        painter.drawLine(-o, 0, -g, 0)
+        painter.drawLine(g, 0, o, 0)
+        painter.drawLine(0, -o, 0, -g)
+        painter.drawLine(0, g, 0, o)
+        painter.drawEllipse(QPointF(0.0, 0.0), float(cr), float(cr))
+
+
+class _CoordArrowItem(QGraphicsItem):
+    """Direction arrow from a start to an end scene position.
+
+    Drawn in scene coordinates with a cosmetic shaft and a screen-space
+    fixed-size arrowhead (14 px long, 6 px half-base) so the arrowhead
+    looks consistent regardless of zoom level.
+    """
+
+    _HEAD_LEN_PX = 14  # arrowhead length in screen pixels
+    _HEAD_BASE_PX = 6  # arrowhead half-base width in screen pixels
+
+    def __init__(self, start: QPointF, end: QPointF, view):
+        super().__init__()
+        self._start = QPointF(start)
+        self._end = QPointF(end)
+        self._view = view
+        self.setZValue(499)
+
+    def update_end(self, end: QPointF):
+        self.prepareGeometryChange()
+        self._end = QPointF(end)
+        self.update()
+
+    def _scene_margin(self):
+        """Generous scene-unit margin large enough to contain the screen-space arrowhead."""
+        scale = float(self._view.transform().m11()) if self._view else 1.0
+        return max(self._HEAD_LEN_PX / max(scale, 1e-6), 20.0)
+
+    def boundingRect(self):
+        xs = [self._start.x(), self._end.x()]
+        ys = [self._start.y(), self._end.y()]
+        m = self._scene_margin()
+        return QRectF(
+            min(xs) - m,
+            min(ys) - m,
+            max(xs) - min(xs) + 2 * m,
+            max(ys) - min(ys) + 2 * m,
+        )
+
+    def paint(self, painter, option, widget=None):
+        dx = self._end.x() - self._start.x()
+        dy = self._end.y() - self._start.y()
+        if math.hypot(dx, dy) < 1e-6:
+            return
+
+        # Cosmetic shaft
+        pen = QPen(QColor(255, 80, 0))
+        pen.setWidth(2)
+        pen.setCosmetic(True)
+        painter.setPen(pen)
+        painter.drawLine(self._start, self._end)
+
+        # Arrowhead in screen (device) space, mapped back to scene
+        t = painter.transform()
+        start_dev = t.map(self._start)
+        end_dev = t.map(self._end)
+        ddx = end_dev.x() - start_dev.x()
+        ddy = end_dev.y() - start_dev.y()
+        len_dev = math.hypot(ddx, ddy)
+        if len_dev < 1e-6:
+            return
+        ux, uy = ddx / len_dev, ddy / len_dev
+        px, py = -uy, ux  # perpendicular
+        hl, hb = self._HEAD_LEN_PX, self._HEAD_BASE_PX
+        tip_dev = end_dev
+        base_dev = QPointF(tip_dev.x() - ux * hl, tip_dev.y() - uy * hl)
+        p1_dev = QPointF(base_dev.x() + px * hb, base_dev.y() + py * hb)
+        p2_dev = QPointF(base_dev.x() - px * hb, base_dev.y() - py * hb)
+
+        inv_t, ok = t.inverted()
+        if not ok:
+            return
+        painter.setBrush(QBrush(QColor(255, 80, 0)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawPolygon(QPolygonF([inv_t.map(tip_dev), inv_t.map(p1_dev), inv_t.map(p2_dev)]))
 
 
 class _LayersMixin:
@@ -1832,6 +1938,32 @@ class _LayersMixin:
                 self._osm_node_props_dragging = False
                 return True
 
+        # ── Alt+right-click: start direction arrow (drag to set yaw) ────
+        if (
+            obj is self.view.viewport()
+            and t == QEvent.Type.MouseButtonPress
+            and event.button() == Qt.MouseButton.RightButton
+            and bool(event.modifiers() & Qt.KeyboardModifier.AltModifier)
+            and not bool(
+                event.modifiers()
+                & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+            )
+        ):
+            scene_pos = self.view.mapToScene(event.pos())
+            self._start_coord_arrow(scene_pos)
+            return True
+
+        # ── Alt+right-click release: finalise direction arrow ────────────
+        if (
+            obj is self.view.viewport()
+            and t == QEvent.Type.MouseButtonRelease
+            and event.button() == Qt.MouseButton.RightButton
+            and getattr(self, '_arrow_start_scene_pos', None) is not None
+        ):
+            scene_pos = self.view.mapToScene(event.pos())
+            self._finish_coord_arrow(scene_pos)
+            return True
+
         # ── OSM right-click: stitch / split / add / delete node ───
         if (
             obj is self.view.viewport()
@@ -1875,6 +2007,10 @@ class _LayersMixin:
                     return True
                 if self._on_osm_add_node(scene_pos):
                     return True
+
+        # ── View resize: reposition coordinate bar overlay ───────────────
+        if obj is self.view and t == QEvent.Type.Resize:
+            self._reposition_coord_bar()
 
         # ── OSM node-dot dragging (highest priority) ─────────────────
         if obj is self.view and t == QEvent.Type.KeyPress:
@@ -2097,6 +2233,11 @@ class _LayersMixin:
             scene_pos = self.view.mapToScene(event.pos())
             self._last_mouse_scene_pos = scene_pos
             self._update_osm_hover(scene_pos)
+            if getattr(self, '_arrow_start_scene_pos', None) is not None:
+                # Arrow drag in progress — update live preview
+                self._update_arrow_preview(scene_pos)
+            elif not self._coord_marker_pinned:
+                self._update_coord_bar(scene_pos)
         elif obj is self.view.viewport() and t == QEvent.Type.Leave:
             self._clear_osm_hover()
         elif (
@@ -2212,6 +2353,125 @@ class _LayersMixin:
         )
         if color.isValid():
             self.view.setBackgroundBrush(color)
+
+    # ── Coordinate marker ─────────────────────────────────────────────────
+
+    def _update_coord_bar(self, scene_pos, heading_end=None) -> None:
+        """Update the coord bar text fields from a scene position.
+
+        If *heading_end* (a QPointF) is provided, the heading from *scene_pos*
+        toward *heading_end* is appended to both fields.
+        """
+        sx, sy = float(scene_pos.x()), float(scene_pos.y())
+        if self.map_ctx:
+            lat, lon = self._scene_to_latlon(sx, sy)
+            mpp = self.map_ctx.mpp
+            carla_x_cm = (sx * mpp + self.map_ctx.world_offset[0]) * 100.0
+            carla_y_cm = (sy * mpp + self.map_ctx.world_offset[1]) * 100.0
+            if heading_end is not None:
+                dx = heading_end.x() - sx
+                dy = heading_end.y() - sy
+                length = math.hypot(dx, dy)
+                if length > 1e-6:
+                    # Geo bearing: clockwise from North (0-360°)
+                    geo_hdg = math.degrees(math.atan2(dx, -dy)) % 360
+                    # CARLA yaw: angle from +X axis (CCW positive, standard math convention)
+                    carla_yaw = math.degrees(math.atan2(dy, dx))
+                    self._coord_geo.setText(f'{lat:.6f}, {lon:.6f}, {geo_hdg:.1f}°')
+                    self._coord_carla.setText(
+                        f'{carla_x_cm:.1f}, {carla_y_cm:.1f}, {carla_yaw:.1f}°'
+                    )
+                else:
+                    self._coord_geo.setText(f'{lat:.6f}, {lon:.6f}, —')
+                    self._coord_carla.setText(f'{carla_x_cm:.1f}, {carla_y_cm:.1f}, —')
+            else:
+                self._coord_geo.setText(f'{lat:.6f}, {lon:.6f}')
+                self._coord_carla.setText(f'{carla_x_cm:.1f}, {carla_y_cm:.1f}')
+        else:
+            self._coord_geo.setText('—')
+            self._coord_carla.setText('—')
+
+    def _start_coord_arrow(self, scene_pos) -> None:
+        """Called on Alt+right-click press: place crosshair and begin direction drag."""
+        # Remove previous marker and arrow
+        if self._coord_marker is not None:
+            self.scene.removeItem(self._coord_marker)
+            self._coord_marker = None
+        if getattr(self, '_coord_arrow_item', None) is not None:
+            self.scene.removeItem(self._coord_arrow_item)
+            self._coord_arrow_item = None
+
+        self._arrow_start_scene_pos = scene_pos
+        self._coord_marker_pinned = False  # live bar visible during drag
+
+        # Place crosshair at the start point
+        marker = _CoordMarkerItem()
+        marker.setPos(scene_pos)
+        marker.setZValue(500)
+        marker.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations, True)
+        self.scene.addItem(marker)
+        self._coord_marker = marker
+
+        # Create arrow preview (start == end until dragged)
+        arrow = _CoordArrowItem(scene_pos, scene_pos, self.view)
+        self.scene.addItem(arrow)
+        self._coord_arrow_item = arrow
+
+        self._update_coord_bar(scene_pos)
+        self._reposition_coord_bar()
+
+    def _update_arrow_preview(self, scene_pos) -> None:
+        """Called during Alt+right-click drag: update arrow and coord bar live."""
+        start = self._arrow_start_scene_pos
+        if getattr(self, '_coord_arrow_item', None) is not None:
+            self._coord_arrow_item.update_end(scene_pos)
+        self._update_coord_bar(start, heading_end=scene_pos)
+
+    def _finish_coord_arrow(self, scene_pos) -> None:
+        """Called on Alt+right-click release: finalise arrow and freeze coord bar."""
+        start = self._arrow_start_scene_pos
+        self._arrow_start_scene_pos = None
+
+        dx = scene_pos.x() - start.x()
+        dy = scene_pos.y() - start.y()
+        has_direction = math.hypot(dx, dy) > 3.0  # must drag > 3 scene px
+
+        if getattr(self, '_coord_arrow_item', None) is not None:
+            if has_direction:
+                self._coord_arrow_item.update_end(scene_pos)
+            else:
+                # Barely moved — discard the arrow item
+                self.scene.removeItem(self._coord_arrow_item)
+                self._coord_arrow_item = None
+
+        self._update_coord_bar(start, heading_end=scene_pos if has_direction else None)
+        self._coord_marker_pinned = True
+        self._btn_clear_marker.setVisible(True)
+        self._reposition_coord_bar()
+
+    def _reposition_coord_bar(self) -> None:
+        """Pin the coordinate bar to the bottom edge of the viewport."""
+        if not hasattr(self, '_coord_bar'):
+            return
+        vw = self.view.width()
+        vh = self.view.height()
+        bh = self._coord_bar.sizeHint().height()
+        self._coord_bar.setGeometry(0, vh - bh, vw, bh)
+        self._coord_bar.raise_()
+
+    def _clear_coord_marker(self) -> None:
+        """Remove the coordinate marker/arrow and unfreeze live cursor tracking."""
+        if self._coord_marker is not None:
+            self.scene.removeItem(self._coord_marker)
+            self._coord_marker = None
+        if getattr(self, '_coord_arrow_item', None) is not None:
+            self.scene.removeItem(self._coord_arrow_item)
+            self._coord_arrow_item = None
+        self._arrow_start_scene_pos = None
+        self._coord_marker_pinned = False
+        self._btn_clear_marker.setVisible(False)
+        self._coord_geo.clear()
+        self._coord_carla.clear()
 
     def zoom_in(self):
         if self.view.transform().m11() < MAX_ZOOM_SCALE:

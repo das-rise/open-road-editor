@@ -8,21 +8,21 @@
     "segment_info_height": 141,
     "node_info_height": 131,
     "segment_info_key_col_width": 145,
-    "display_zoom_pct": 8389,
-    "viewport_center_x": 1032.3524475097643,
-    "viewport_center_y": 638.9617919921867,
+    "display_zoom_pct": 16385,
+    "viewport_center_x": 930.7426391703416,
+    "viewport_center_y": 649.3837167719629,
     "settings": {
-      "show_esri": true,
-      "show_carla_bev": false,
+      "show_esri": false,
+      "show_carla_bev": true,
       "show_opendrive": true,
       "show_opendrive_objects": true,
-      "world_edit_mode": false,
+      "world_edit_mode": true,
       "esri_edit_mode": false,
       "carla_edit_mode": false,
       "server_ip": "localhost",
       "server_port": "8080",
-      "opendrive_alpha": 1.0,
-      "zoom_pct": 8389,
+      "opendrive_alpha": 0.6,
+      "zoom_pct": 16385,
       "show_grid": false,
       "tile_zoom": 18,
       "esri_offset_x": 2.31,
@@ -81,16 +81,39 @@
       "viewport_bg_color": "#9a9996",
       "origin_lat": 57.474079,
       "origin_lon": 11.98408,
-      "bound_north": 1299.92,
-      "bound_south": -836.38,
-      "bound_east": 1814.52,
-      "bound_west": -1150.84,
-      "splitter_map_w": 1191,
-      "splitter_right_w": 647
+      "bound_north": 1300.58,
+      "bound_south": -836.63,
+      "bound_east": 1800.0,
+      "bound_west": -1200.0,
+      "splitter_map_w": 1196,
+      "splitter_right_w": 650
     },
     "carla_metadata": {
-      "server_meta": null,
-      "server_bounds": null
+      "server_meta": {
+        "town": "GbgSaroRound",
+        "mpp": 0.3210838207304987,
+        "world_offset": [
+          1200.0,
+          -1400.0
+        ],
+        "world_bounds": [
+          1200.0,
+          1800.0,
+          -1400.0,
+          -800.0
+        ],
+        "width_px": 1869,
+        "height_px": 1869,
+        "max_zoom": 18,
+        "ref_lat": 57.47407900000002,
+        "ref_lon": 11.98408
+      },
+      "server_bounds": [
+        139813,
+        139820,
+        79655,
+        79662
+      ]
     }
   }
 }

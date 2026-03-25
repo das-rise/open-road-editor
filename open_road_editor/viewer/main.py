@@ -285,6 +285,9 @@ class OpenDriveViewer(
         self._layer_pipeline_lock = threading.Lock()
         self._suppress_async_layer_pipeline = False
         self._last_mouse_scene_pos = QPointF(0.0, 0.0)
+        self._coord_marker = None  # _CoordMarkerItem placed by Alt+right-click
+        self._coord_arrow_item = None  # _CoordArrowItem for direction arrow
+        self._arrow_start_scene_pos = None  # set while user is dragging the direction arrow
         self._osm_blink_item = None
         self._osm_blink_on = False
         self._osm_blink_timer = QTimer(self)
@@ -310,6 +313,42 @@ class OpenDriveViewer(
         _bg_hex = self.settings.value('viewport_bg_color', DEFAULT_VIEWPORT_BG_COLOR_HEX)
         self.view.setBackgroundBrush(QColor(_bg_hex))
         self.splitter.addWidget(self.view)
+
+        # ── Coordinate bar overlay (bottom of viewport) ───────────────────
+        self._coord_bar = QFrame(self.view)
+        self._coord_bar.setAutoFillBackground(True)
+        self._coord_bar.setStyleSheet(
+            'QFrame { background-color: rgba(30,30,30,210); border-top: 1px solid #666; }'
+            ' QLabel { color: #ccc; }'
+            ' QLineEdit { background: #1e1e1e; color: #eee; border: 1px solid #555;'
+            ' border-radius: 3px; padding: 1px 4px; }'
+        )
+        _coord_bar_layout = QHBoxLayout(self._coord_bar)
+        _coord_bar_layout.setContentsMargins(8, 4, 8, 4)
+        _coord_bar_layout.setSpacing(8)
+        _coord_bar_layout.addWidget(QLabel('Geo:'))
+        self._coord_geo = QLineEdit()
+        self._coord_geo.setReadOnly(True)
+        self._coord_geo.setPlaceholderText('Alt+right-click to place marker')
+        self._coord_geo.setToolTip('Geographic coordinates (lat, lon) of the placed marker')
+        self._coord_geo.setMinimumWidth(210)
+        _coord_bar_layout.addWidget(self._coord_geo)
+        _coord_bar_layout.addWidget(QLabel('CARLA (cm):'))
+        self._coord_carla = QLineEdit()
+        self._coord_carla.setReadOnly(True)
+        self._coord_carla.setPlaceholderText('—')
+        self._coord_carla.setToolTip('CARLA coordinates (x, y) in cm from origin')
+        self._coord_carla.setMinimumWidth(210)
+        _coord_bar_layout.addWidget(self._coord_carla)
+        self._btn_clear_marker = QPushButton('Clear Marker')
+        self._btn_clear_marker.setToolTip('Remove the coordinate marker from the viewport')
+        self._btn_clear_marker.clicked.connect(self._clear_coord_marker)
+        self._btn_clear_marker.setVisible(False)
+        _coord_bar_layout.addWidget(self._btn_clear_marker)
+        _coord_bar_layout.addStretch()
+        self._coord_bar.adjustSize()
+        self._coord_bar.setVisible(True)
+        self._coord_marker_pinned: bool = False
 
         # ── Right pane: toggle strip + sidebar ────────────────────────────
         self._right_pane = QWidget()
