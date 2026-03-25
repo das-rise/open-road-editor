@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <OpenDRIVE>
-    <header revMajor="1" revMinor="4" name="" version="1.00" date="Wed Mar 25 12:19:25 2026" north="1299.92" south="836.38" east="1814.52" west="1150.84">
+    <header revMajor="1" revMinor="4" name="" version="1.00" date="Wed Mar 25 15:31:36 2026" north="1299.92" south="836.38" east="1814.52" west="1150.84">
         <geoReference>
  
  +proj=tmerc +lat_0=57.474079 +lon_0=11.984080
@@ -752,8 +752,8 @@
             </laneSection>
         </lanes>
         <objects>
-            <object id="-22.pole" type="pole" name="Sign Pole" s="20.59729586" t="-1.73612016" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects>
-        <signals><signal id="-22" type="206" name="yield" s="20.59729586" t="-1.73612016" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
+            <object id="-21.pole" type="pole" name="Sign Pole" s="20.59729586" t="-1.73612016" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects>
+        <signals><signal id="-21" type="206" name="yield" s="20.59729586" t="-1.73612016" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
         <userData code="sumoId" value="147779296" />
     </road>
     <road name="Valldavägen" length="60.76340873" id="241" junction="-1">
@@ -811,8 +811,8 @@
             </laneSection>
         </lanes>
         <objects>
-            <object id="-33.pole" type="pole" name="Sign Pole" s="59.97645664" t="-1.73972221" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects>
-        <signals><signal id="-33" type="206" name="yield" s="59.97645664" t="-1.73972221" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
+            <object id="-32.pole" type="pole" name="Sign Pole" s="59.97645664" t="-1.73972221" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects>
+        <signals><signal id="-32" type="206" name="yield" s="59.97645664" t="-1.73972221" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
         <userData code="sumoId" value="147779299" />
     </road>
     <road name="Valldavägen" length="24.07619501" id="242" junction="-1">
@@ -924,8 +924,8 @@
             </laneSection>
         </lanes>
         <objects>
-            <object id="-54.pole" type="pole" name="Sign Pole" s="65.22184331" t="-1.75185920" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects>
-        <signals><signal id="-54" type="206" name="yield" s="65.22184331" t="-1.75185920" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
+            <object id="-52.pole" type="pole" name="Sign Pole" s="65.22184331" t="-1.75185920" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects>
+        <signals><signal id="-52" type="206" name="yield" s="65.22184331" t="-1.75185920" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
         <userData code="sumoId" value="147779302" />
     </road>
     <road name="Sandövägen" length="14.54021672" id="244" junction="-1">
@@ -1009,9 +1009,9 @@
                  </right>
             </laneSection>
         </lanes>
-        <signals><signal id="-63" type="206" name="yield" s="15.63306053" t="-1.75118197" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
+        <signals><signal id="-61" type="206" name="yield" s="15.63306053" t="-1.75118197" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
         <userData code="sumoId" value="147779306" />
-    <objects><object id="-63.pole" type="pole" name="Sign Pole" s="15.63306053" t="-1.75118197" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects></road>
+    <objects><object id="-61.pole" type="pole" name="Sign Pole" s="15.63306053" t="-1.75118197" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects></road>
     <road name="Sandövägen" length="179.62821254" id="246" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="6" />
@@ -1291,8 +1291,8 @@
             </laneSection>
         </lanes>
         <objects>
-            <object id="-109.pole" type="pole" name="Sign Pole" s="217.41527802" t="-1.75131022" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects>
-        <signals><signal id="-109" type="206" name="yield" s="217.41527802" t="-1.75131022" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
+            <object id="-107.pole" type="pole" name="Sign Pole" s="217.41527802" t="-1.75131022" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects>
+        <signals><signal id="-107" type="206" name="yield" s="217.41527802" t="-1.75131022" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
         <userData code="sumoId" value="147779320" />
     </road>
     <road name="Säröleden" length="66.23727430" id="250" junction="-1">
@@ -1645,9 +1645,9 @@
                  </right>
             </laneSection>
         </lanes>
-        <signals><signal id="-153" type="206" name="yield" s="61.92511018" t="-1.74678625" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
+        <signals><signal id="-151" type="206" name="yield" s="61.92511018" t="-1.74678625" dynamic="no" zOffset="2.0" country="SE" width="0.9" height="0.8" hOffset="0.00000000" pitch="0.0" roll="0.0" orientation="+" /></signals>
         <userData code="sumoId" value="147779334" />
-    <objects><object id="-153.pole" type="pole" name="Sign Pole" s="61.92511018" t="-1.74678625" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects></road>
+    <objects><object id="-151.pole" type="pole" name="Sign Pole" s="61.92511018" t="-1.74678625" zOffset="0.0" height="2.0" radius="0.05" dynamic="no" hdg="0.0" pitch="0.0" roll="0.0" /></objects></road>
     <road name="Valldavägen" length="2.66581700" id="258" junction="-1">
         <link>
             <predecessor elementType="junction" elementId="13" />
@@ -2046,7 +2046,7 @@
         <userData code="sumoId" value="29085076" />
     </road>
 
-    <road name=":-111_0" length="11.11048744" id="266" junction="20">
+    <road name=":-109_0" length="11.11048744" id="266" junction="20">
         <link>
             <predecessor elementType="road" elementId="249" contactPoint="end" />
             <successor elementType="road" elementId="256" contactPoint="start" />
@@ -2084,7 +2084,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-111_1" length="10.78526047" id="267" junction="20">
+    <road name=":-109_1" length="10.78526047" id="267" junction="20">
         <link>
             <predecessor elementType="road" elementId="255" contactPoint="end" />
             <successor elementType="road" elementId="256" contactPoint="start" />
@@ -2122,7 +2122,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-133_0" length="16.48959746" id="268" junction="21">
+    <road name=":-131_0" length="16.48959746" id="268" junction="21">
         <link>
             <predecessor elementType="road" elementId="257" contactPoint="end" />
             <successor elementType="road" elementId="252" contactPoint="start" />
@@ -2160,7 +2160,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-133_1" length="9.90927690" id="269" junction="21">
+    <road name=":-131_1" length="9.90927690" id="269" junction="21">
         <link>
             <predecessor elementType="road" elementId="251" contactPoint="end" />
             <successor elementType="road" elementId="252" contactPoint="start" />
@@ -2198,7 +2198,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-139_0" length="13.94432341" id="270" junction="9">
+    <road name=":-137_0" length="13.94432341" id="270" junction="9">
         <link>
             <predecessor elementType="road" elementId="254" contactPoint="end" />
             <successor elementType="road" elementId="237" contactPoint="start" />
@@ -2236,7 +2236,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-139_1" length="12.00613683" id="271" junction="9">
+    <road name=":-137_1" length="12.00613683" id="271" junction="9">
         <link>
             <predecessor elementType="road" elementId="254" contactPoint="end" />
             <successor elementType="road" elementId="255" contactPoint="start" />
@@ -2350,7 +2350,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-23_0" length="8.89037015" id="275" junction="11">
+    <road name=":-22_0" length="8.89037015" id="275" junction="11">
         <link>
             <predecessor elementType="road" elementId="240" contactPoint="end" />
             <successor elementType="road" elementId="262" contactPoint="start" />
@@ -2388,7 +2388,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-23_1" length="5.66472921" id="276" junction="11">
+    <road name=":-22_1" length="5.66472921" id="276" junction="11">
         <link>
             <predecessor elementType="road" elementId="261" contactPoint="end" />
             <successor elementType="road" elementId="262" contactPoint="start" />
@@ -2426,7 +2426,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-24_0" length="16.33345609" id="277" junction="12">
+    <road name=":-23_0" length="16.33345609" id="277" junction="12">
         <link>
             <predecessor elementType="road" elementId="252" contactPoint="end" />
             <successor elementType="road" elementId="241" contactPoint="start" />
@@ -2464,7 +2464,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-24_1" length="13.14133336" id="278" junction="12">
+    <road name=":-23_1" length="13.14133336" id="278" junction="12">
         <link>
             <predecessor elementType="road" elementId="252" contactPoint="end" />
             <successor elementType="road" elementId="253" contactPoint="start" />
@@ -2502,7 +2502,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-34_0" length="8.51748606" id="279" junction="13">
+    <road name=":-33_0" length="8.51748606" id="279" junction="13">
         <link>
             <predecessor elementType="road" elementId="241" contactPoint="end" />
             <successor elementType="road" elementId="258" contactPoint="start" />
@@ -2540,7 +2540,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-34_1" length="5.25098497" id="280" junction="13">
+    <road name=":-33_1" length="5.25098497" id="280" junction="13">
         <link>
             <predecessor elementType="road" elementId="263" contactPoint="end" />
             <successor elementType="road" elementId="258" contactPoint="start" />
@@ -2578,7 +2578,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-35_0" length="8.58395352" id="281" junction="14">
+    <road name=":-34_0" length="8.58395352" id="281" junction="14">
         <link>
             <predecessor elementType="road" elementId="260" contactPoint="end" />
             <successor elementType="road" elementId="242" contactPoint="start" />
@@ -2616,7 +2616,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-35_1" length="7.05531080" id="282" junction="14">
+    <road name=":-34_1" length="7.05531080" id="282" junction="14">
         <link>
             <predecessor elementType="road" elementId="260" contactPoint="end" />
             <successor elementType="road" elementId="261" contactPoint="start" />
@@ -2654,7 +2654,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-43_0" length="10.89816633" id="283" junction="15">
+    <road name=":-41_0" length="10.89816633" id="283" junction="15">
         <link>
             <predecessor elementType="road" elementId="262" contactPoint="end" />
             <successor elementType="road" elementId="243" contactPoint="start" />
@@ -2692,7 +2692,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-43_1" length="7.53886916" id="284" junction="15">
+    <road name=":-41_1" length="7.53886916" id="284" junction="15">
         <link>
             <predecessor elementType="road" elementId="262" contactPoint="end" />
             <successor elementType="road" elementId="263" contactPoint="start" />
@@ -2730,7 +2730,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-55_0" length="14.27307057" id="285" junction="16">
+    <road name=":-53_0" length="14.27307057" id="285" junction="16">
         <link>
             <predecessor elementType="road" elementId="243" contactPoint="end" />
             <successor elementType="road" elementId="254" contactPoint="start" />
@@ -2768,7 +2768,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-55_1" length="10.67412517" id="286" junction="16">
+    <road name=":-53_1" length="10.67412517" id="286" junction="16">
         <link>
             <predecessor elementType="road" elementId="253" contactPoint="end" />
             <successor elementType="road" elementId="254" contactPoint="start" />
@@ -2806,7 +2806,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-56_0" length="8.35104145" id="287" junction="17">
+    <road name=":-54_0" length="8.35104145" id="287" junction="17">
         <link>
             <predecessor elementType="road" elementId="258" contactPoint="end" />
             <successor elementType="road" elementId="244" contactPoint="start" />
@@ -2844,7 +2844,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-56_1" length="7.16939226" id="288" junction="17">
+    <road name=":-54_1" length="7.16939226" id="288" junction="17">
         <link>
             <predecessor elementType="road" elementId="258" contactPoint="end" />
             <successor elementType="road" elementId="259" contactPoint="start" />
@@ -2882,7 +2882,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-60_0" length="7.54593510" id="289" junction="6">
+    <road name=":-58_0" length="7.54593510" id="289" junction="6">
         <link>
             <predecessor elementType="road" elementId="244" contactPoint="end" />
             <successor elementType="road" elementId="246" contactPoint="start" />
@@ -2920,7 +2920,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-60_2" length="5.01368455" id="291" junction="6">
+    <road name=":-58_2" length="5.01368455" id="291" junction="6">
         <link>
             <predecessor elementType="road" elementId="234" contactPoint="end" />
             <successor elementType="road" elementId="245" contactPoint="start" />
@@ -2958,7 +2958,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-64_0" length="8.70507166" id="292" junction="18">
+    <road name=":-62_0" length="8.70507166" id="292" junction="18">
         <link>
             <predecessor elementType="road" elementId="245" contactPoint="end" />
             <successor elementType="road" elementId="260" contactPoint="start" />
@@ -2996,7 +2996,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-64_1" length="4.83986983" id="293" junction="18">
+    <road name=":-62_1" length="4.83986983" id="293" junction="18">
         <link>
             <predecessor elementType="road" elementId="259" contactPoint="end" />
             <successor elementType="road" elementId="260" contactPoint="start" />
@@ -3110,7 +3110,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-85_0" length="12.17567350" id="296" junction="2">
+    <road name=":-83_0" length="12.17567350" id="296" junction="2">
         <link>
             <predecessor elementType="road" elementId="239" contactPoint="end" />
             <successor elementType="road" elementId="247" contactPoint="start" />
@@ -3148,7 +3148,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-85_1" length="12.18277125" id="297" junction="2">
+    <road name=":-83_1" length="12.18277125" id="297" junction="2">
         <link>
             <predecessor elementType="road" elementId="239" contactPoint="end" />
             <successor elementType="road" elementId="234" contactPoint="start" />
@@ -3186,7 +3186,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-85_2" length="12.18277125" id="298" junction="2">
+    <road name=":-83_2" length="12.18277125" id="298" junction="2">
         <link>
             <predecessor elementType="road" elementId="246" contactPoint="end" />
             <successor elementType="road" elementId="231" contactPoint="start" />
@@ -3224,7 +3224,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-85_3" length="14.97807348" id="299" junction="2">
+    <road name=":-83_3" length="14.97807348" id="299" junction="2">
         <link>
             <predecessor elementType="road" elementId="246" contactPoint="end" />
             <successor elementType="road" elementId="247" contactPoint="start" />
@@ -3262,7 +3262,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-85_4" length="14.97807348" id="300" junction="2">
+    <road name=":-83_4" length="14.97807348" id="300" junction="2">
         <link>
             <predecessor elementType="road" elementId="233" contactPoint="end" />
             <successor elementType="road" elementId="234" contactPoint="start" />
@@ -3300,7 +3300,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-85_5" length="12.17567350" id="301" junction="2">
+    <road name=":-83_5" length="12.17567350" id="301" junction="2">
         <link>
             <predecessor elementType="road" elementId="233" contactPoint="end" />
             <successor elementType="road" elementId="231" contactPoint="start" />
@@ -3338,7 +3338,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-86_0" length="16.35505449" id="302" junction="19">
+    <road name=":-84_0" length="16.35505449" id="302" junction="19">
         <link>
             <predecessor elementType="road" elementId="256" contactPoint="end" />
             <successor elementType="road" elementId="248" contactPoint="start" />
@@ -3376,7 +3376,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-86_1" length="14.33565867" id="303" junction="19">
+    <road name=":-84_1" length="14.33565867" id="303" junction="19">
         <link>
             <predecessor elementType="road" elementId="256" contactPoint="end" />
             <successor elementType="road" elementId="251" contactPoint="start" />
@@ -3414,7 +3414,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-95_0" length="0.51245702" id="304" junction="4">
+    <road name=":-93_0" length="0.51245702" id="304" junction="4">
         <link>
             <predecessor elementType="road" elementId="248" contactPoint="end" />
             <successor elementType="road" elementId="232" contactPoint="start" />
@@ -3452,7 +3452,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-95_1" length="0.28081927" id="305" junction="4">
+    <road name=":-93_1" length="0.28081927" id="305" junction="4">
         <link>
             <predecessor elementType="road" elementId="265" contactPoint="end" />
             <successor elementType="road" elementId="257" contactPoint="start" />
@@ -3490,7 +3490,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-96_0" length="0.18958119" id="306" junction="8">
+    <road name=":-94_0" length="0.18958119" id="306" junction="8">
         <link>
             <predecessor elementType="road" elementId="235" contactPoint="end" />
             <successor elementType="road" elementId="249" contactPoint="start" />
@@ -3528,7 +3528,7 @@
         </lanes>
         <signals />
     </road>
-    <road name=":-96_1" length="0.30479234" id="307" junction="8">
+    <road name=":-94_1" length="0.30479234" id="307" junction="8">
         <link>
             <predecessor elementType="road" elementId="237" contactPoint="end" />
             <successor elementType="road" elementId="250" contactPoint="start" />
@@ -3567,7 +3567,7 @@
         <signals />
     </road>
 
-    <junction name="-111" id="20">
+    <junction name="-109" id="20">
         <connection id="0" incomingRoad="249" connectingRoad="266" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3575,7 +3575,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-133" id="21">
+    <junction name="-131" id="21">
         <connection id="0" incomingRoad="257" connectingRoad="268" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3583,7 +3583,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-139" id="9">
+    <junction name="-137" id="9">
         <connection id="0" incomingRoad="254" connectingRoad="270" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3599,7 +3599,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
         </junction>
-    <junction name="-23" id="11">
+    <junction name="-22" id="11">
         <connection id="0" incomingRoad="240" connectingRoad="275" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3607,7 +3607,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-24" id="12">
+    <junction name="-23" id="12">
         <connection id="0" incomingRoad="252" connectingRoad="277" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3615,7 +3615,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-34" id="13">
+    <junction name="-33" id="13">
         <connection id="0" incomingRoad="241" connectingRoad="279" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3623,7 +3623,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-35" id="14">
+    <junction name="-34" id="14">
         <connection id="0" incomingRoad="260" connectingRoad="281" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3631,7 +3631,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-43" id="15">
+    <junction name="-41" id="15">
         <connection id="0" incomingRoad="262" connectingRoad="283" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3639,7 +3639,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-55" id="16">
+    <junction name="-53" id="16">
         <connection id="0" incomingRoad="243" connectingRoad="285" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3647,7 +3647,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-56" id="17">
+    <junction name="-54" id="17">
         <connection id="0" incomingRoad="258" connectingRoad="287" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3655,7 +3655,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-60" id="6">
+    <junction name="-58" id="6">
         <connection id="0" incomingRoad="244" connectingRoad="289" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3663,7 +3663,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-64" id="18">
+    <junction name="-62" id="18">
         <connection id="0" incomingRoad="245" connectingRoad="292" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3679,7 +3679,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-85" id="2">
+    <junction name="-83" id="2">
         <connection id="0" incomingRoad="239" connectingRoad="296" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3699,7 +3699,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-86" id="19">
+    <junction name="-84" id="19">
         <connection id="0" incomingRoad="256" connectingRoad="302" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3707,7 +3707,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-95" id="4">
+    <junction name="-93" id="4">
         <connection id="0" incomingRoad="248" connectingRoad="304" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
@@ -3715,7 +3715,7 @@
             <laneLink from="-1" to="-1" />
         </connection>
     </junction>
-    <junction name="-96" id="8">
+    <junction name="-94" id="8">
         <connection id="0" incomingRoad="235" connectingRoad="306" contactPoint="start">
             <laneLink from="-1" to="-1" />
         </connection>
