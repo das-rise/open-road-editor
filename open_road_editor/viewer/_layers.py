@@ -2206,6 +2206,13 @@ class _LayersMixin:
                 self.grid_item.grid_color = color
                 self.grid_item.update()
 
+    def pick_viewport_bg_color(self):
+        color = QColorDialog.getColor(
+            self.view.backgroundBrush().color(), self, 'Select Background Color'
+        )
+        if color.isValid():
+            self.view.setBackgroundBrush(color)
+
     def zoom_in(self):
         if self.view.transform().m11() < MAX_ZOOM_SCALE:
             self.view.scale(ZOOM_IN_FACTOR, ZOOM_IN_FACTOR)

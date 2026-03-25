@@ -2138,11 +2138,31 @@ class _OsmMixin:
     # ── Node dragging ─────────────────────────────────────────────────
 
     def _osm_dot_at(self, scene_pos) -> 'QGraphicsEllipseItem | None':
-        """Return the node-dot item under *scene_pos*, or None."""
-        for it in self.scene.items(scene_pos):
-            if it in self._osm_dot_to_index:
-                return it
-        return None
+        """Return the node-dot item nearest to *scene_pos* in screen space, or None.
+
+        Using scene.items() is unreliable for ItemIgnoresTransformations dots because
+        Qt requires the view's deviceTransform to compute the correct screen-space hit
+        area; without it the hit region is the raw local rect in scene units (10×10 at
+        any zoom), which mis-selects the wrong dot at zoom ≠ 1.  We instead project
+        both the click and every dot centre into viewport pixels and pick the closest
+        one within the dot's screen radius.
+        """
+        if not self._osm_dot_to_index:
+            return None
+        view_pos = self.view.mapFromScene(scene_pos)
+        vx, vy = float(view_pos.x()), float(view_pos.y())
+        r = self._OSM_NODE_DOT_RADIUS
+        best_dot = None
+        best_dist_sq = r * r  # must be within the visual dot radius
+        for dot in self._osm_dot_to_index:
+            dp = self.view.mapFromScene(dot.pos())
+            dx = vx - float(dp.x())
+            dy = vy - float(dp.y())
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < best_dist_sq:
+                best_dist_sq = dist_sq
+                best_dot = dot
+        return best_dot
 
     def _osm_way_item_at(self, scene_pos, exclude_item=None):
         """Return OSM way item under scene_pos, optionally excluding one item."""

@@ -68,6 +68,7 @@ OOR_TILE_HATCH_COLOR = (200, 200, 200, 200)
 TILE_ERROR_TEXT_COLOR = (200, 0, 0, 255)
 TILE_PLACEHOLDER_BG_COLOR = (140, 140, 140, 220)
 DEFAULT_GRID_COLOR = QColor(0, 0, 0, 255)
+VIEWPORT_BACKGROUND_COLOR = QColor(154, 153, 150)
 GRID_AXIS_COLOR = QColor(220, 30, 30, 220)
 GRID_CROSS_COLOR = QColor(220, 30, 30, 255)
 XODR_HOVER_COLOR = QColor(255, 200, 0, 230)
@@ -177,6 +178,13 @@ OSM2XODR_SCHEMA: list = [
             ('junction_corner_detail', 'int', '5'),
             ('junction_scurve_stretch', 'float', '1.0'),
             ('junction_join_dist', 'float', '10.0'),
+        ],
+    ),
+    (
+        'postprocess',
+        [
+            ('auto_prune_split_junctions', 'bool', 'true'),
+            ('prune_connection_rules', 'str', ''),
         ],
     ),
     (
@@ -318,6 +326,7 @@ ESRI_OFFSET_RANGE = (-1000, 1000)
 GRID_THICKNESS_RANGE = (1, 10)
 GRID_FONT_SIZE_RANGE = (6, 48)
 DEFAULT_GRID_COLOR_HEX = '#000000'
+DEFAULT_VIEWPORT_BG_COLOR_HEX = '#9a9996'
 
 # ---------------------------------------------------------------------------
 # Concurrency / threading

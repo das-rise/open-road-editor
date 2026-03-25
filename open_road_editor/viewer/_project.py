@@ -90,6 +90,7 @@ class _ProjectMixin:
             'grid_color': self.grid_item.grid_color.name()
             if self.grid_item
             else DEFAULT_GRID_COLOR_HEX,
+            'viewport_bg_color': self.view.backgroundBrush().color().name(),
             'origin_lat': self.spin_origin_lat.value(),
             'origin_lon': self.spin_origin_lon.value(),
             'bound_north': self.spin_bound_north.value(),
@@ -205,6 +206,8 @@ class _ProjectMixin:
                 )
             if 'grid_color' in state and self.grid_item:
                 self.grid_item.grid_color = QColor(str(state.get('grid_color')))
+            if 'viewport_bg_color' in state:
+                self.view.setBackgroundBrush(QColor(str(state.get('viewport_bg_color'))))
 
             saved_map = state.get('splitter_map_w')
             saved_right = state.get('splitter_right_w')
@@ -585,6 +588,7 @@ class _ProjectMixin:
             self.spin_grid_sigdigits.setValue(MAX_GRID_LABEL_DIGITS)
             if self.grid_item:
                 self.grid_item.grid_color = QColor(DEFAULT_GRID_COLOR_HEX)
+            self.view.setBackgroundBrush(QColor(DEFAULT_VIEWPORT_BG_COLOR_HEX))
 
             # ── Stop spinner if running ───────────────────────────────────
             self.spinner_timer.stop()

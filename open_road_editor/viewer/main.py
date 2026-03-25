@@ -307,6 +307,8 @@ class OpenDriveViewer(
         # ── Map view ──────────────────────────────────────────────────────
         self.scene = QGraphicsScene()
         self.view = ZoomableGraphicsView(self.scene)
+        _bg_hex = self.settings.value('viewport_bg_color', DEFAULT_VIEWPORT_BG_COLOR_HEX)
+        self.view.setBackgroundBrush(QColor(_bg_hex))
         self.splitter.addWidget(self.view)
 
         # ── Right pane: toggle strip + sidebar ────────────────────────────
@@ -1073,6 +1075,17 @@ class OpenDriveViewer(
         self.btn_color.clicked.connect(self.pick_grid_color)
         grid_row.addWidget(self.btn_color)
         general_layout.addLayout(grid_row)
+
+        appearance_row = QHBoxLayout()
+        appearance_row.setSpacing(6)
+        appearance_row.addWidget(QLabel('Background:'))
+        self.btn_bg_color = QPushButton('Color\u2026')
+        self.btn_bg_color.setToolTip('Viewport background color')
+        self.btn_bg_color.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_bg_color.clicked.connect(self.pick_viewport_bg_color)
+        appearance_row.addWidget(self.btn_bg_color)
+        appearance_row.addStretch()
+        general_layout.addLayout(appearance_row)
         panel.addWidget(grp_general)
 
         # ── Layer-settings enable/disable wiring ──────────────────────────
