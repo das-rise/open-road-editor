@@ -107,6 +107,8 @@ Z_OSM_NODE_DOTS = 200
 Z_OSM_SELECTED_ARROWS = 201
 
 XODR_SEAM_PEN_WIDTH_PX = 2.4
+# Width of the exterior road-boundary marking lines drawn in the vector viewer.
+XODR_MARKING_LINE_WIDTH_PX = 2.0
 
 # ---------------------------------------------------------------------------
 # Timing / timers (milliseconds)

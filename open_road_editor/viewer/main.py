@@ -20,6 +20,7 @@ from PyQt6.QtGui import (
 )
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFrame,
     QGraphicsItemGroup,
@@ -257,6 +258,7 @@ class OpenDriveViewer(
         self._osm_deleted_way_ids: set = set()  # existing way IDs removed by merge
         self._osm_deleted_node_ids: set = set()  # standalone node IDs explicitly deleted
         self._osm_dirty: bool = False  # True when OSM edits changed since last successful save
+        self._xodr_dirty: bool = False  # True when lane markings were redrawn since last project save
         self._osm_relation_edit_mode: dict = {'preceding': False, 'succeeding': False}
         self._osm_relation_draft: dict = {'preceding': None, 'succeeding': None}
         self._osm_tags_edit_mode: bool = False
@@ -762,6 +764,33 @@ class OpenDriveViewer(
         self._alpha_saved = float(self.settings.value('opendrive_alpha', DEFAULT_OPENDRIVE_ALPHA))
         self._alpha_only_mode = False  # resolved correctly on first update_visibility()
         alpha_row.addWidget(self.spin_opendrive_alpha)
+        alpha_row.addSpacing(8)
+        alpha_row.addWidget(QLabel('Centerline:'))
+        self.combo_xodr_centerline_marking = QComboBox()
+        self.combo_xodr_centerline_marking.setToolTip(
+            'Style for undivided two-way centerline road marks'
+        )
+        self.combo_xodr_centerline_marking.addItem('White broken', 'WhiteBroken')
+        self.combo_xodr_centerline_marking.addItem('Yellow solid', 'YellowSolid')
+        self.combo_xodr_centerline_marking.addItem('None', 'None')
+        _centerline_style = str(
+            self.settings.value('opendrive_centerline_marking', 'WhiteBroken')
+            or 'WhiteBroken'
+        )
+        _centerline_idx = self.combo_xodr_centerline_marking.findData(_centerline_style)
+        if _centerline_idx < 0:
+            _centerline_idx = 0
+        self.combo_xodr_centerline_marking.setCurrentIndex(_centerline_idx)
+        self.combo_xodr_centerline_marking.currentIndexChanged.connect(
+            self._on_xodr_centerline_marking_changed
+        )
+        alpha_row.addWidget(self.combo_xodr_centerline_marking)
+        self.btn_redraw_lane_markings = QPushButton('Redraw lane markings')
+        self.btn_redraw_lane_markings.setToolTip(
+            'Recompute exterior road-boundary markings for the loaded .xodr file'
+        )
+        self.btn_redraw_lane_markings.clicked.connect(self._on_redraw_lane_markings)
+        alpha_row.addWidget(self.btn_redraw_lane_markings)
         alpha_row.addStretch()
         xodr_opts_layout.addLayout(alpha_row)
 

@@ -59,6 +59,9 @@ class LanePolygon:
     predecessor_key: str
     successor_key: str
     points: List[Tuple[float, float]]
+    # Number of points belonging to the outer edge (first slice of ``points``).
+    # The remaining points are the inner edge in reverse order.
+    outer_point_count: int = 0
 
 
 @dataclass
@@ -76,6 +79,16 @@ class ReconstructedLane:
         if self.inner_edge is None:
             self.inner_edge = []
 
+
+# Lane types that make up the drivable road surface (used for marking union).
+_ROAD_SURFACE_TYPES: frozenset = frozenset(
+    {"driving", "border", "shoulder", "parking", "restricted"}
+)
+_ROAD_MARK_WIDTH_M = "0.13"
+_DEFAULT_BIDIRECTIONAL_CENTERLINE_STYLE = "WhiteBroken"
+_BIDIRECTIONAL_REFERENCE_MATCH_TOLERANCE_M = 2.0
+_BIDIRECTIONAL_BROKEN_LINE_LENGTH_M = 3.0
+_BIDIRECTIONAL_BROKEN_LINE_GAP_M = 6.0
 
 _LANE_TYPE_COLORS = {
     "sidewalk": (200, 200, 200, 255),
@@ -138,6 +151,92 @@ def _resample(
             continue
         out.append(_interpolate(points[seg], points[seg + 1], (s - s0) / (s1 - s0)))
     return out
+
+
+def _ensure_single_road_mark(
+    lane_el: ET.Element,
+    mark_type: str,
+    color: str = "standard",
+    width: str = _ROAD_MARK_WIDTH_M,
+) -> None:
+    road_marks = lane_el.findall("roadMark")
+    if not road_marks:
+        road_marks = [ET.SubElement(lane_el, "roadMark")]
+
+    first = road_marks[0]
+    first.set("sOffset", "0")
+    first.set("type", str(mark_type or "none"))
+    first.set("weight", "standard")
+    first.set("color", str(color or "standard"))
+    first.set("width", str(width or _ROAD_MARK_WIDTH_M))
+
+    for extra in road_marks[1:]:
+        lane_el.remove(extra)
+
+
+def _format_road_mark_s_offset(s_offset: float) -> str:
+    text = f"{max(0.0, float(s_offset)):.6f}"
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+def _set_road_mark_records(
+    lane_el: ET.Element,
+    records: Sequence[Tuple[float, str, str]],
+    width: str = _ROAD_MARK_WIDTH_M,
+) -> None:
+    for road_mark in list(lane_el.findall("roadMark")):
+        lane_el.remove(road_mark)
+
+    clean_records: List[Tuple[float, str, str]] = []
+    for s_offset, mark_type, color in records:
+        clean_records.append(
+            (
+                max(0.0, float(s_offset)),
+                str(mark_type or "none"),
+                str(color or "standard"),
+            )
+        )
+    if not clean_records:
+        clean_records = [(0.0, "none", "standard")]
+    clean_records.sort(key=lambda record: record[0])
+    if clean_records[0][0] > 1e-6:
+        clean_records.insert(0, (0.0, "none", "standard"))
+    else:
+        first = clean_records[0]
+        clean_records[0] = (0.0, first[1], first[2])
+
+    merged_records: List[Tuple[float, str, str]] = []
+    for s_offset, mark_type, color in clean_records:
+        if merged_records and mark_type == merged_records[-1][1] and color == merged_records[-1][2]:
+            continue
+        merged_records.append((s_offset, mark_type, color))
+
+    for s_offset, mark_type, color in merged_records:
+        road_mark = ET.SubElement(lane_el, "roadMark")
+        road_mark.set("sOffset", _format_road_mark_s_offset(s_offset))
+        road_mark.set("type", mark_type)
+        road_mark.set("weight", "standard")
+        road_mark.set("color", color)
+        road_mark.set("width", str(width or _ROAD_MARK_WIDTH_M))
+
+
+def _normalize_centerline_style(style: str | None) -> str:
+    text = str(style or _DEFAULT_BIDIRECTIONAL_CENTERLINE_STYLE).strip()
+    compact = text.replace("_", "").replace("-", "").replace(" ", "").lower()
+    if compact in ("none", "off", "false", "0", "disabled"):
+        return "None"
+    if compact in ("yellowsolid", "solidyellow", "yellow", "solid"):
+        return "YellowSolid"
+    return "WhiteBroken"
+
+
+def _centerline_mark_for_style(style: str | None) -> Tuple[str, str] | None:
+    normalized = _normalize_centerline_style(style)
+    if normalized == "None":
+        return None
+    if normalized == "YellowSolid":
+        return ("solid", "yellow")
+    return ("broken", "standard")
 
 
 def _left_right_edges(
@@ -543,8 +642,54 @@ class OpenDriveRenderer:
                     predecessor_key=predecessor_key,
                     successor_key=successor_key,
                     points=outer_points + list(reversed(inner_points)),
+                    outer_point_count=len(outer_points),
                 )
             )
+        return out
+
+    def _build_section_lane_edge_samples(
+        self,
+        road: ODRRoad,
+        section_s0: float,
+        section_s1: float,
+        section_samples: Sequence[Tuple[float, float, float, float]],
+        lanes: Sequence[ODRLane],
+        side: str,
+    ) -> Dict[int, List[Tuple[float, Tuple[float, float], Tuple[float, float]]]]:
+        """Return lane edge samples keyed by lane id.
+
+        Each sample is ``(sOffset, outer_point, inner_point)`` in the same
+        display/world coordinate frame used by lane polygons.
+        """
+        out: Dict[int, List[Tuple[float, Tuple[float, float], Tuple[float, float]]]] = {}
+        for lane_idx, lane in enumerate(lanes):
+            samples: List[Tuple[float, Tuple[float, float], Tuple[float, float]]] = []
+            inner_lanes = lanes[:lane_idx]
+
+            for s, x, y, hdg in section_samples:
+                ds = max(0.0, min(s - section_s0, section_s1 - section_s0))
+                lane_offset = self._lane_offset_at_s(road, s)
+                inner_width_sum = sum(
+                    self._lane_width_at_s(inner_lane, ds) for inner_lane in inner_lanes
+                )
+                lane_width = self._lane_width_at_s(lane, ds)
+
+                if side == "left":
+                    inner_off = lane_offset + inner_width_sum
+                    outer_off = inner_off + lane_width
+                else:
+                    inner_off = lane_offset - inner_width_sum
+                    outer_off = inner_off - lane_width
+
+                px, py = -math.sin(hdg), math.cos(hdg)
+                ix = x + px * inner_off
+                iy = y + py * inner_off
+                ox = x + px * outer_off
+                oy = y + py * outer_off
+                samples.append((ds, (ox, -oy), (ix, -iy)))
+
+            if len(samples) >= 2:
+                out[int(lane.id)] = samples
         return out
 
     def _connected_lane_key(
@@ -809,3 +954,763 @@ class OpenDriveRenderer:
         x = x0 + s * math.cos(hdg0)
         y = y0 + s * math.sin(hdg0)
         return (x, y, hdg0)
+
+    # ------------------------------------------------------------------
+    # Exterior road-marking computation
+    # ------------------------------------------------------------------
+
+    def get_road_marking_polylines(
+        self,
+        s_step: float = 1.0,
+        raster_mpp: float = 0.2,
+    ) -> List[List[Tuple[float, float]]]:
+        """Return the exterior boundary of the road surface as polylines.
+
+        Uses a raster union of all driving-type lane polygons to find the
+        outer contour, avoiding markings on internal road patches (e.g.
+        inside roundabout junction areas).
+
+        Returns a list of closed polylines in world coordinates (x, y).
+        """
+        import cv2
+        from scipy.ndimage import uniform_filter1d
+
+        polygons = self.get_lane_polygons(max(0.25, float(s_step)))
+        if not polygons:
+            return []
+
+        road_polys = [p for p in polygons if p.lane_type in _ROAD_SURFACE_TYPES]
+        if not road_polys:
+            return []
+
+        all_x = [x for p in road_polys for x, y in p.points]
+        all_y = [y for p in road_polys for x, y in p.points]
+        if not all_x:
+            return []
+
+        scale = max(0.1, float(raster_mpp))
+        margin = max(2.0, scale * 8)
+        min_x = min(all_x) - margin
+        min_y = min(all_y) - margin
+        max_x = max(all_x) + margin
+        max_y = max(all_y) + margin
+
+        w = int((max_x - min_x) / scale) + 2
+        h = int((max_y - min_y) / scale) + 2
+        # Cap to a reasonable raster size to avoid excessive memory use.
+        if w > 10000 or h > 10000:
+            scale = max(
+                (max_x - min_x) / 9998.0,
+                (max_y - min_y) / 9998.0,
+            )
+            w = int((max_x - min_x) / scale) + 2
+            h = int((max_y - min_y) / scale) + 2
+        if w <= 1 or h <= 1:
+            return []
+
+        mask = Image.new("L", (w, h), 0)
+        draw = ImageDraw.Draw(mask)
+        for poly in road_polys:
+            px_pts = [
+                (int((x - min_x) / scale), int((y - min_y) / scale))
+                for x, y in poly.points
+            ]
+            if len(px_pts) >= 3:
+                draw.polygon(px_pts, fill=255)
+
+        mask_arr = np.array(mask, dtype=np.uint8)
+
+        # RETR_CCOMP: returns both the outer road boundary (level-0 external
+        # contours) AND the inner hole boundaries (level-1 holes, e.g. the
+        # inner edge of a roundabout ring or median island).  Internal patch
+        # seams are absorbed into the union fill and never appear as contours.
+        # CHAIN_APPROX_NONE: keep every contour pixel so smoothing has full data.
+        contours, _ = cv2.findContours(
+            mask_arr, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE
+        )
+
+        # Smoothing window: ~1.5 m in pixels, minimum 5 pixels.
+        smooth_px = max(5, int(1.5 / scale) | 1)  # keep odd for symmetry
+
+        # Approximation epsilon: ~0.3 m in pixels (reduces point density post-smooth).
+        approx_eps = max(1.0, 0.3 / scale)
+
+        result: List[List[Tuple[float, float]]] = []
+        for cnt in contours:
+            if len(cnt) < 5:
+                continue
+            pts_px = cnt[:, 0, :].astype(float)  # shape (N, 2)
+
+            # Circular moving-average smoothing on x and y independently.
+            # mode='wrap' treats the contour as a closed loop so the seam
+            # between the first and last point is handled correctly.
+            pts_px[:, 0] = uniform_filter1d(pts_px[:, 0], size=smooth_px, mode="wrap")
+            pts_px[:, 1] = uniform_filter1d(pts_px[:, 1], size=smooth_px, mode="wrap")
+
+            # Reduce point density with Douglas-Peucker approximation.
+            pts_int = pts_px.astype(np.int32).reshape(-1, 1, 2)
+            approx = cv2.approxPolyDP(pts_int, epsilon=approx_eps, closed=True)
+            if len(approx) < 3:
+                continue
+
+            pts = [
+                (
+                    float(p[0][0]) * scale + min_x,
+                    float(p[0][1]) * scale + min_y,
+                )
+                for p in approx
+            ]
+            pts.append(pts[0])  # close the loop
+            result.append(pts)
+        return result
+
+    @staticmethod
+    def _is_single_surface_lane_road(road: ODRRoad) -> bool:
+        for section in getattr(road, "lane_sections", []) or []:
+            surface_lane_count = 0
+            for lane in list(getattr(section, "left_lanes", []) or []) + list(
+                getattr(section, "right_lanes", []) or []
+            ):
+                try:
+                    lane_id = int(getattr(lane, "id", 0))
+                except (TypeError, ValueError):
+                    lane_id = 0
+                if (
+                    lane_id != 0
+                    and str(getattr(lane, "type", "") or "") in _ROAD_SURFACE_TYPES
+                ):
+                    surface_lane_count += 1
+            if surface_lane_count != 1:
+                return False
+        return True
+
+    def _road_reference_point(
+        self,
+        road: ODRRoad,
+        s: float,
+    ) -> Tuple[float, float] | None:
+        length = float(getattr(road, "length", 0.0) or 0.0)
+        if length <= 1e-6:
+            return None
+        state = self._road_state_at_s(
+            road.id,
+            max(1e-6, min(float(s), length - 1e-6)),
+        )
+        if state is None:
+            return None
+        _, x, y, _ = state
+        return (float(x), -float(y))
+
+    def _is_opposite_undivided_road_pair(
+        self,
+        road: ODRRoad,
+        candidate: ODRRoad,
+    ) -> bool:
+        if (
+            road.id == candidate.id
+            or str(getattr(road, "junction_id", "-1")) != "-1"
+            or str(getattr(candidate, "junction_id", "-1")) != "-1"
+            or not self._is_single_surface_lane_road(road)
+            or not self._is_single_surface_lane_road(candidate)
+        ):
+            return False
+
+        length = float(getattr(road, "length", 0.0) or 0.0)
+        candidate_length = float(getattr(candidate, "length", 0.0) or 0.0)
+        if length <= 1e-6 or candidate_length <= 1e-6:
+            return False
+
+        length_tolerance = max(2.0, max(length, candidate_length) * 0.03)
+        if abs(length - candidate_length) > length_tolerance:
+            return False
+
+        for fraction in (0.0, 0.25, 0.5, 0.75, 1.0):
+            road_s = min(length - 1e-6, max(1e-6, length * fraction))
+            candidate_s = min(
+                candidate_length - 1e-6,
+                max(1e-6, candidate_length * (1.0 - fraction)),
+            )
+            road_point = self._road_reference_point(road, road_s)
+            candidate_point = self._road_reference_point(candidate, candidate_s)
+            if road_point is None or candidate_point is None:
+                return False
+            if (
+                math.hypot(
+                    road_point[0] - candidate_point[0],
+                    road_point[1] - candidate_point[1],
+                )
+                > _BIDIRECTIONAL_REFERENCE_MATCH_TOLERANCE_M
+            ):
+                return False
+        return True
+
+    def _bidirectional_center_mark_road_ids(self) -> set[str]:
+        # Match CARLA's topology redraw: ordinary undivided two-way roads are
+        # represented as two opposite one-lane roads sharing the same reference
+        # line.  Mark one representative so the centerline is not duplicated.
+        bidirectional_center_mark_roads: set[str] = set()
+        if self._data is None:
+            return bidirectional_center_mark_roads
+
+        roads = list(getattr(self._data, "roads", []) or [])
+        handled_roads: set[str] = set()
+        for road in roads:
+            if road.id in handled_roads:
+                continue
+            if (
+                str(getattr(road, "junction_id", "-1")) != "-1"
+                or not self._is_single_surface_lane_road(road)
+            ):
+                continue
+
+            opposite_road = None
+            for candidate in roads:
+                if candidate.id in handled_roads:
+                    continue
+                if self._is_opposite_undivided_road_pair(road, candidate):
+                    opposite_road = candidate
+                    break
+            if opposite_road is None:
+                continue
+
+            bidirectional_center_mark_roads.add(road.id)
+            handled_roads.add(road.id)
+            handled_roads.add(opposite_road.id)
+        return bidirectional_center_mark_roads
+
+    @staticmethod
+    def _roundabout_ring_road_ids_from_root(root: ET.Element) -> set[str]:
+        groups: dict[str, list[str]] = {}
+        for road_el in root.findall("road"):
+            if road_el.get("junction", "-1") != "-1":
+                continue
+            pred_el = road_el.find("./link/predecessor")
+            succ_el = road_el.find("./link/successor")
+            if (
+                pred_el is None
+                or succ_el is None
+                or pred_el.get("elementType") != "junction"
+                or succ_el.get("elementType") != "junction"
+            ):
+                continue
+
+            sumo_id = ""
+            for user_data in road_el.findall("userData"):
+                if user_data.get("code") == "sumoId":
+                    sumo_id = str(user_data.get("value", "") or "")
+                    break
+            if "#" not in sumo_id:
+                continue
+            base_id = sumo_id.split("#", 1)[0]
+            if base_id:
+                groups.setdefault(base_id, []).append(str(road_el.get("id", "")))
+
+        ring_roads: set[str] = set()
+        for road_ids in groups.values():
+            if len(road_ids) >= 4:
+                ring_roads.update(road_id for road_id in road_ids if road_id)
+        return ring_roads
+
+    @staticmethod
+    def _roundabout_connector_road_ids_from_root(
+        root: ET.Element,
+        roundabout_ring_road_ids: set[str],
+    ) -> Tuple[set[str], set[str]]:
+        ring_ids = {str(road_id) for road_id in roundabout_ring_road_ids if road_id}
+        connector_roads: set[str] = set()
+        circulator_connector_roads: set[str] = set()
+        if not ring_ids:
+            return connector_roads, circulator_connector_roads
+
+        for road_el in root.findall("road"):
+            road_id = str(road_el.get("id", "") or "")
+            if not road_id or road_el.get("junction", "-1") == "-1":
+                continue
+
+            connected_ring_ids: set[str] = set()
+            for link_tag in ("predecessor", "successor"):
+                link_el = road_el.find(f"./link/{link_tag}")
+                if link_el is None or link_el.get("elementType") != "road":
+                    continue
+                link_road_id = str(link_el.get("elementId", "") or "")
+                if link_road_id in ring_ids:
+                    connected_ring_ids.add(link_road_id)
+
+            if connected_ring_ids:
+                connector_roads.add(road_id)
+            if len(connected_ring_ids) >= 2:
+                circulator_connector_roads.add(road_id)
+
+        return connector_roads, circulator_connector_roads
+
+    def _road_reference_polyline(
+        self,
+        road: ODRRoad,
+        s_start: float,
+        s_end: float,
+        step_m: float,
+    ) -> List[Tuple[float, float]]:
+        length = float(getattr(road, "length", 0.0) or 0.0)
+        if length <= 1e-6:
+            return []
+
+        clamped_start = min(length - 1e-6, max(1e-6, float(s_start)))
+        clamped_end = min(length - 1e-6, max(1e-6, float(s_end)))
+        if clamped_end - clamped_start <= 1e-6:
+            return []
+
+        step = max(0.25, float(step_m))
+        targets: List[float] = []
+        s = clamped_start
+        while s < clamped_end:
+            targets.append(s)
+            s += step
+        if not targets or abs(targets[-1] - clamped_end) > 1e-9:
+            targets.append(clamped_end)
+
+        points: List[Tuple[float, float]] = []
+        for target_s in targets:
+            state = self._road_state_at_s(road.id, target_s)
+            if state is None:
+                continue
+            _, x, y, _ = state
+            point = (float(x), -float(y))
+            if not points or math.hypot(
+                point[0] - points[-1][0], point[1] - points[-1][1]
+            ) > 1e-6:
+                points.append(point)
+        return points
+
+    def get_bidirectional_center_marking_polylines(
+        self,
+        centerline_style: str | None = _DEFAULT_BIDIRECTIONAL_CENTERLINE_STYLE,
+        s_step: float = 1.0,
+    ) -> List[Dict[str, object]]:
+        """Return ORE/CARLA-style centerline markings for undivided roads.
+
+        Each returned record contains ``points`` plus a simple ``type`` and
+        ``color``.  Broken markings are returned as individual dash polylines so
+        the viewer uses the same 3 m dash / 6 m gap pattern as CARLA's topology
+        lane-marking redraw.
+        """
+        mark = _centerline_mark_for_style(centerline_style)
+        if self._data is None or mark is None:
+            return []
+
+        mark_type, mark_color = mark
+        display_color = "yellow" if mark_color == "yellow" else "white"
+        road_ids = self._bidirectional_center_mark_road_ids()
+        out: List[Dict[str, object]] = []
+
+        for road_id in sorted(road_ids):
+            road = self._roads_by_id.get(road_id)
+            if road is None or str(getattr(road, "junction_id", "-1")) != "-1":
+                continue
+
+            road_length = float(getattr(road, "length", 0.0) or 0.0)
+            if road_length <= 1e-6:
+                continue
+
+            if mark_type == "broken":
+                dash_start = 1e-6
+                while dash_start < road_length - 1e-6:
+                    dash_end = min(
+                        dash_start + _BIDIRECTIONAL_BROKEN_LINE_LENGTH_M,
+                        road_length - 1e-6,
+                    )
+                    points = self._road_reference_polyline(
+                        road, dash_start, dash_end, max(0.25, float(s_step))
+                    )
+                    if len(points) >= 2:
+                        out.append(
+                            {
+                                "points": points,
+                                "type": mark_type,
+                                "color": display_color,
+                            }
+                        )
+                    dash_start += (
+                        _BIDIRECTIONAL_BROKEN_LINE_LENGTH_M
+                        + _BIDIRECTIONAL_BROKEN_LINE_GAP_M
+                    )
+            else:
+                points = self._road_reference_polyline(
+                    road, 1e-6, road_length - 1e-6, max(0.25, float(s_step))
+                )
+                if len(points) >= 2:
+                    out.append(
+                        {
+                            "points": points,
+                            "type": mark_type,
+                            "color": display_color,
+                        }
+                    )
+        return out
+
+    def rewrite_exterior_road_marks(
+        self,
+        xodr_path: str,
+        s_step: float = 1.0,
+        tolerance_m: float = 1.5,
+        centerline_style: str | None = _DEFAULT_BIDIRECTIONAL_CENTERLINE_STYLE,
+    ) -> bool:
+        """Rewrite roadMark elements so the XODR carries ORE-style markings.
+
+        Algorithm:
+        1. Rasterise all road-surface lane polygons to build a binary mask.
+        2. Find the exterior contour and inner holes of the union.
+        3. Build a tolerance-band contour mask by drawing the contour with a
+           thickness equal to ``tolerance_m`` converted to pixels.
+        4. For every lane polygon, sample the outer and inner edge points and
+           check whether they fall inside the tolerance band.
+        5. Non-center lanes whose outer edge is on the exterior get
+           ``type="solid"``.  Center lanes get ``type="solid"`` when the road
+           reference line is an exterior/hole boundary, or the selected
+           bidirectional style for one representative of each opposite-
+           direction undivided road pair.
+
+        Returns True on success, False on failure.
+        """
+        import cv2
+
+        if self._data is None:
+            return False
+
+        # ---- Step 1: raster mask ----------------------------------------
+        polygons = self.get_lane_polygons(max(0.25, float(s_step)))
+        road_polys = [p for p in polygons if p.lane_type in _ROAD_SURFACE_TYPES]
+        if not road_polys:
+            return False
+
+        all_x = [x for p in road_polys for x, y in p.points]
+        all_y = [y for p in road_polys for x, y in p.points]
+
+        raster_mpp = 0.4
+        margin = max(2.0, raster_mpp * 4)
+        min_x = min(all_x) - margin
+        min_y = min(all_y) - margin
+        max_x = max(all_x) + margin
+        max_y = max(all_y) + margin
+
+        scale = raster_mpp
+        w = int((max_x - min_x) / scale) + 2
+        h = int((max_y - min_y) / scale) + 2
+        if w > 8000 or h > 8000:
+            scale = max((max_x - min_x) / 7998.0, (max_y - min_y) / 7998.0)
+            w = int((max_x - min_x) / scale) + 2
+            h = int((max_y - min_y) / scale) + 2
+        if w <= 1 or h <= 1:
+            return False
+
+        mask = Image.new("L", (w, h), 0)
+        draw_img = ImageDraw.Draw(mask)
+        for poly in road_polys:
+            px_pts = [
+                (int((x - min_x) / scale), int((y - min_y) / scale))
+                for x, y in poly.points
+            ]
+            if len(px_pts) >= 3:
+                draw_img.polygon(px_pts, fill=255)
+
+        mask_arr = np.array(mask, dtype=np.uint8)
+
+        # ---- Step 2 & 3: road boundary tolerance band (outer + inner edges) ----
+        # RETR_CCOMP captures both the outer road boundary and inner hole edges
+        # (e.g. the inner edge of a roundabout ring), matching what is drawn in
+        # the viewer so the xodr marks align with the displayed lines.
+        contours, _ = cv2.findContours(
+            mask_arr, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_TC89_L1
+        )
+        thickness_px = max(1, int(tolerance_m / scale) * 2 + 1)
+        contour_band = np.zeros_like(mask_arr)
+        cv2.drawContours(contour_band, contours, -1, 255, thickness=thickness_px)
+
+        try:
+            tree = ET.parse(xodr_path)
+            root = tree.getroot()
+        except ET.ParseError:
+            return False
+        roundabout_ring_road_ids = self._roundabout_ring_road_ids_from_root(root)
+        (
+            roundabout_connector_road_ids,
+            roundabout_circulator_connector_road_ids,
+        ) = self._roundabout_connector_road_ids_from_root(root, roundabout_ring_road_ids)
+
+        # ---- Step 4: segment each lane's outer and inner edges ----------
+        # Build maps:
+        #   lane_key -> roadMark records for the lane's outer edge.
+        #   lane_key(0) -> roadMark records for the road reference/inner edge.
+        # Mark records are segmented so roundabout entries/exits cut out the
+        # ring's outer line when that edge is no longer part of the exterior
+        # road-surface contour.
+        lane_mark_records: dict[str, List[Tuple[float, str, str]]] = {}
+        center_mark_records: dict[str, List[Tuple[float, str, str]]] = {}
+
+        def point_in_road_mask(point: Tuple[float, float]) -> bool:
+            x, y = point
+            px = int((x - min_x) / scale)
+            py = int((y - min_y) / scale)
+            return 0 <= px < w and 0 <= py < h and mask_arr[py, px] > 0
+
+        def point_touches_contour_band(point: Tuple[float, float]) -> bool:
+            x, y = point
+            px = int((x - min_x) / scale)
+            py = int((y - min_y) / scale)
+            return 0 <= px < w and 0 <= py < h and contour_band[py, px] > 0
+
+        def point_is_surface_boundary(
+            boundary: Tuple[float, float],
+            opposite: Tuple[float, float],
+        ) -> bool:
+            vx = float(opposite[0]) - float(boundary[0])
+            vy = float(opposite[1]) - float(boundary[1])
+            length = math.hypot(vx, vy)
+            if length <= 1e-6:
+                return point_touches_contour_band(boundary)
+
+            nx = vx / length
+            ny = vy / length
+            probe = min(max(0.35, scale * 1.5), max(0.15, length * 0.45))
+            lane_side = (boundary[0] + nx * probe, boundary[1] + ny * probe)
+            other_side = (boundary[0] - nx * probe, boundary[1] - ny * probe)
+
+            lane_side_is_road = point_in_road_mask(lane_side) or point_in_road_mask(boundary)
+            other_side_is_road = point_in_road_mask(other_side)
+            return lane_side_is_road and not other_side_is_road
+
+        def smooth_flags(flags: Sequence[bool]) -> List[bool]:
+            if len(flags) < 5:
+                return list(flags)
+            out_flags: List[bool] = []
+            for idx in range(len(flags)):
+                window = flags[max(0, idx - 2) : min(len(flags), idx + 3)]
+                out_flags.append(sum(1 for flag in window if flag) >= (len(window) + 1) // 2)
+            return out_flags
+
+        def edge_boundary_ratio(
+            edge_samples: Sequence[
+                Tuple[float, Tuple[float, float], Tuple[float, float]]
+            ],
+        ) -> float:
+            if not edge_samples:
+                return 0.0
+            return sum(
+                1
+                for _, boundary, opposite in edge_samples
+                if point_is_surface_boundary(boundary, opposite)
+            ) / float(
+                len(edge_samples)
+            )
+
+        def records_for_edge(
+            edge_samples: Sequence[
+                Tuple[float, Tuple[float, float], Tuple[float, float]]
+            ],
+        ) -> List[Tuple[float, str, str]]:
+            if not edge_samples:
+                return [(0.0, "none", "standard")]
+            flags = smooth_flags(
+                [
+                    point_is_surface_boundary(boundary, opposite)
+                    for _, boundary, opposite in edge_samples
+                ]
+            )
+            if not flags:
+                return [(0.0, "none", "standard")]
+
+            current = flags[0]
+            records: List[Tuple[float, str, str]] = [
+                (0.0, "solid" if current else "none", "standard")
+            ]
+            for idx in range(1, len(flags)):
+                if flags[idx] == current:
+                    continue
+                transition_s = 0.5 * (
+                    float(edge_samples[idx - 1][0]) + float(edge_samples[idx][0])
+                )
+                if transition_s - records[-1][0] > 0.25:
+                    records.append(
+                        (transition_s, "solid" if flags[idx] else "none", "standard")
+                    )
+                current = flags[idx]
+            return records
+
+        for road in self._data.roads:
+            sections = sorted(road.lane_sections, key=lambda sec: sec.s)
+            for idx, section in enumerate(sections):
+                s0 = float(section.s)
+                s1 = float(sections[idx + 1].s) if idx + 1 < len(sections) else float(road.length)
+                section_samples = self._section_centerline_samples(road.id, s0, s1)
+                if len(section_samples) < 2:
+                    continue
+
+                side_edges: Dict[int, List[Tuple[float, Tuple[float, float], Tuple[float, float]]]] = {}
+                left_lanes = sorted(section.left_lanes, key=lambda lane: lane.id)
+                right_lanes = sorted(section.right_lanes, key=lambda lane: abs(lane.id))
+                side_edges.update(
+                    self._build_section_lane_edge_samples(
+                        road, s0, s1, section_samples, left_lanes, "left"
+                    )
+                )
+                side_edges.update(
+                    self._build_section_lane_edge_samples(
+                        road, s0, s1, section_samples, right_lanes, "right"
+                    )
+                )
+
+                center_key = self._lane_key(road.id, s0, 0)
+                best_center_ratio = -1.0
+                best_center_records: List[Tuple[float, str, str]] = [
+                    (0.0, "none", "standard")
+                ]
+
+                for lane_id, samples in side_edges.items():
+                    lane = next(
+                        (
+                            candidate
+                            for candidate in list(left_lanes) + list(right_lanes)
+                            if int(candidate.id) == int(lane_id)
+                        ),
+                        None,
+                    )
+                    lane_key = self._lane_key(road.id, s0, int(lane_id))
+                    if lane is None or str(lane.type or "") not in _ROAD_SURFACE_TYPES:
+                        lane_mark_records[lane_key] = [(0.0, "none", "standard")]
+                        continue
+
+                    outer_samples = [
+                        (s_offset, outer, inner) for s_offset, outer, inner in samples
+                    ]
+                    inner_samples = [
+                        (s_offset, inner, outer) for s_offset, outer, inner in samples
+                    ]
+                    lane_mark_records[lane_key] = records_for_edge(outer_samples)
+
+                    center_ratio = edge_boundary_ratio(inner_samples)
+                    if center_ratio > best_center_ratio:
+                        best_center_ratio = center_ratio
+                        best_center_records = records_for_edge(inner_samples)
+
+                center_mark_records[center_key] = best_center_records
+
+        def points_touch_contour_band(points: Sequence[Tuple[float, float]]) -> bool:
+            if not points:
+                return False
+            step = max(1, len(points) // 16)
+            sampled_points = list(points[::step])
+            if not sampled_points:
+                return False
+            touch_count = 0
+            for x, y in sampled_points:
+                px = int((x - min_x) / scale)
+                py = int((y - min_y) / scale)
+                if 0 <= px < w and 0 <= py < h and contour_band[py, px] > 0:
+                    touch_count += 1
+            if len(sampled_points) <= 3:
+                return touch_count >= max(1, len(sampled_points) - 1)
+            return (touch_count / float(len(sampled_points))) >= 0.35
+
+        for poly in polygons:
+            if poly.lane_type not in _ROAD_SURFACE_TYPES:
+                continue
+            n = len(poly.points)
+            nc = poly.outer_point_count if poly.outer_point_count > 0 else n // 2
+            inner_pts = list(reversed(poly.points[nc:]))
+            if points_touch_contour_band(inner_pts):
+                center_key = self._lane_key(poly.road_id, poly.lanesection_s0, 0)
+                if center_mark_records.get(center_key) == [(0.0, "none", "standard")]:
+                    center_mark_records[center_key] = [(0.0, "solid", "standard")]
+
+        bidirectional_mark = _centerline_mark_for_style(centerline_style)
+        bidirectional_center_mark_roads = (
+            self._bidirectional_center_mark_road_ids()
+            if bidirectional_mark is not None
+            else set()
+        )
+
+        for road_el in root.findall("road"):
+            road_id = road_el.get("id", "")
+            try:
+                road_length = float(road_el.get("length", "0"))
+            except ValueError:
+                road_length = 0.0
+            section_els = road_el.findall("./lanes/laneSection")
+
+            for section_index, section_el in enumerate(section_els):
+                try:
+                    s0 = float(section_el.get("s", "0"))
+                except ValueError:
+                    s0 = 0.0
+                s0_str = f"{s0:.6f}"
+                try:
+                    s1 = (
+                        float(section_els[section_index + 1].get("s", "0"))
+                        if section_index + 1 < len(section_els)
+                        else road_length
+                    )
+                except ValueError:
+                    s1 = road_length
+
+                for side_tag in ("left", "right", "center"):
+                    side_el = section_el.find(side_tag)
+                    if side_el is None:
+                        continue
+                    for lane_el in side_el.findall("lane"):
+                        try:
+                            lane_id = int(lane_el.get("id", "0"))
+                        except ValueError:
+                            lane_id = 0
+
+                        if lane_id == 0:
+                            if (
+                                road_id in roundabout_ring_road_ids
+                                or road_id in roundabout_circulator_connector_road_ids
+                            ):
+                                _ensure_single_road_mark(
+                                    lane_el,
+                                    "solid",
+                                    "standard",
+                                )
+                            elif road_id in roundabout_connector_road_ids:
+                                _ensure_single_road_mark(
+                                    lane_el,
+                                    "none",
+                                    "standard",
+                                )
+                            elif road_id in bidirectional_center_mark_roads:
+                                mark_type, mark_color = bidirectional_mark or (
+                                    "none",
+                                    "standard",
+                                )
+                                _ensure_single_road_mark(
+                                    lane_el,
+                                    mark_type,
+                                    mark_color,
+                                )
+                            else:
+                                center_key = self._lane_key(road_id, s0, 0)
+                                _set_road_mark_records(
+                                    lane_el,
+                                    center_mark_records.get(
+                                        center_key,
+                                        [(0.0, "none", "standard")],
+                                    ),
+                                )
+                            continue
+
+                        lane_key = f"{road_id}/{s0_str}/{lane_id}"
+                        records = lane_mark_records.get(
+                            lane_key,
+                            [(0.0, "none", "standard")],
+                        )
+                        _set_road_mark_records(
+                            lane_el,
+                            records,
+                        )
+
+        try:
+            tree.write(xodr_path, encoding="UTF-8", xml_declaration=True)
+        except Exception:
+            return False
+
+        return True

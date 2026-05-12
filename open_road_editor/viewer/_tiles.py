@@ -1342,6 +1342,25 @@ class _TilesMixin:
             self.btn_browse_xodr.setIcon(QIcon(pixmap))
 
     def closeEvent(self, event):
+        if getattr(self, '_xodr_dirty', False):
+            reply = QMessageBox.question(
+                self,
+                'Unsaved Changes',
+                'Lane markings were redrawn in the .xodr file. '
+                'Do you want to save the project before exiting?',
+                QMessageBox.StandardButton.Save
+                | QMessageBox.StandardButton.Discard
+                | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Save,
+            )
+            if reply == QMessageBox.StandardButton.Save:
+                if not self.save_project():
+                    event.ignore()
+                    return
+            elif reply == QMessageBox.StandardButton.Cancel:
+                event.ignore()
+                return
+
         has_unsaved_changes = self._osm_dirty
         if has_unsaved_changes:
             message = 'You have unsaved changes to the OSM layer. Do you want to save them to the project file before exiting?'

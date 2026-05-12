@@ -694,6 +694,7 @@ class _ProjectMixin:
             self._preferred_project_save_dir = os.path.dirname(file_path) or None
             self._refresh_window_title()
             self._reset_osm_dirty()
+            self._xodr_dirty = False
             self._show_project_status(f'Saved project: {os.path.basename(file_path)}')
             return True
         except Exception as error:

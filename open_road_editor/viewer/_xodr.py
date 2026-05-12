@@ -51,7 +51,7 @@ from PyQt6.QtWidgets import (
 )
 
 from open_road_editor.constants import *  # noqa: F401,F403
-from open_road_editor.constants import _XODR_LANE_COLOR_DEFAULT, _XODR_LANE_COLORS  # noqa: F401
+from open_road_editor.constants import _XODR_LANE_COLOR_DEFAULT, _XODR_LANE_COLORS, XODR_MARKING_LINE_WIDTH_PX  # noqa: F401
 from orbit.gui.graphics.signal_graphics import (
     create_signal_pixmap,
     create_orientation_indicator,
@@ -93,6 +93,28 @@ class _XodrMixin:
         data = im.tobytes("raw", "RGBA")
         qim = QImage(data, im.size[0], im.size[1], QImage.Format.Format_RGBA8888)
         return QPixmap.fromImage(qim)
+
+    def _selected_xodr_centerline_marking(self) -> str:
+        combo = getattr(self, "combo_xodr_centerline_marking", None)
+        if combo is not None:
+            data = combo.currentData()
+            if data:
+                return str(data)
+        return str(
+            self.settings.value("opendrive_centerline_marking", "WhiteBroken")
+            or "WhiteBroken"
+        )
+
+    def _on_xodr_centerline_marking_changed(self, _index: int = 0) -> None:
+        style = self._selected_xodr_centerline_marking()
+        self.settings.setValue("opendrive_centerline_marking", style)
+        if (
+            self.xodr_path
+            and getattr(self, "check_opendrive", None)
+            and self.check_opendrive.isChecked()
+        ):
+            self._show_project_status("OpenDRIVE centerline style updated")
+            self.refresh_opendrive()
 
     def _on_xodr_signals_ready(self, signals) -> None:
         """Main-thread slot: render signals in the scene."""
@@ -222,6 +244,43 @@ class _XodrMixin:
 
         threading.Thread(target=fetch, daemon=True).start()
 
+    def _on_redraw_lane_markings(self) -> None:
+        """Recompute exterior road-boundary marks for the current xodr file and redraw."""
+        if not self.xodr_path:
+            return
+
+        xodr_path = self.xodr_path
+        centerline_style = self._selected_xodr_centerline_marking()
+        self._show_project_status("Redrawing lane markings…")
+        self.lbl_opendrive_status.setText("Redrawing…")
+        btn = getattr(self, "btn_redraw_lane_markings", None)
+        if btn:
+            btn.setEnabled(False)
+
+        def run():
+            try:
+                renderer = opendrive_renderer_bindings_py.OpenDriveRenderer()
+                if renderer.load_map(xodr_path):
+                    renderer.rewrite_exterior_road_marks(
+                        xodr_path,
+                        centerline_style=centerline_style,
+                    )
+            except Exception as exc:
+                print(f"_on_redraw_lane_markings: rewrite failed: {exc}")
+            # Reload the (possibly modified) file in the viewer
+            self.fetch_local_opendrive_vector(xodr_path)
+
+        def _re_enable():
+            if btn:
+                btn.setEnabled(True)
+            self.lbl_opendrive_status.setText("Loaded")
+            self._xodr_dirty = True
+
+        # Re-enable the button once polygons are ready (one-shot connection)
+        self.xodr_polygons_ready.connect(_re_enable, Qt.ConnectionType.SingleShotConnection)
+
+        threading.Thread(target=run, daemon=True).start()
+
     def fetch_local_opendrive(self, xodr_path, on_progress):
         # Local rendering logic
         try:
@@ -327,6 +386,7 @@ class _XodrMixin:
 
     def fetch_local_opendrive_vector(self, xodr_path: str) -> None:
         """Background thread: load XODR and emit lane polygons (no rasterisation)."""
+        centerline_style = self._selected_xodr_centerline_marking()
 
         def run():
             try:
@@ -337,10 +397,31 @@ class _XodrMixin:
                     return
                 # s_step=1.0 m gives smooth curves without excessive memory use
                 polygons = renderer.get_lane_polygons(XODR_POLYGON_STEP_M)
+                # Compute exterior boundary polylines (road marking lines).
+                # These replace per-polygon seam markings with a clean outer contour.
+                try:
+                    marking_polylines = renderer.get_road_marking_polylines(
+                        s_step=XODR_POLYGON_STEP_M
+                    )
+                except Exception as _exc:
+                    print(f"get_road_marking_polylines warning: {_exc}")
+                    marking_polylines = []
+                try:
+                    center_marking_polylines = (
+                        renderer.get_bidirectional_center_marking_polylines(
+                            centerline_style=centerline_style,
+                            s_step=XODR_POLYGON_STEP_M,
+                        )
+                    )
+                except Exception as _exc:
+                    print(f"get_bidirectional_center_marking_polylines warning: {_exc}")
+                    center_marking_polylines = []
                 signals = renderer.get_signals()
                 self.xodr_polygons_ready.emit(
                     {
                         "polygons": polygons,
+                        "marking_polylines": marking_polylines,
+                        "center_marking_polylines": center_marking_polylines,
                     }
                 )
                 self.xodr_signals_ready.emit(signals)
@@ -354,7 +435,13 @@ class _XodrMixin:
         """Main-thread slot: convert LanePolygons to QGraphicsPathItems in the scene."""
         self._clear_xodr_vector_items(clear_signals=False)
 
+        marking_polylines = []
+        center_marking_polylines = []
         if isinstance(polygons, dict):
+            marking_polylines = list(polygons.get("marking_polylines") or [])
+            center_marking_polylines = list(
+                polygons.get("center_marking_polylines") or []
+            )
             polygons = list(polygons.get("polygons") or [])
 
         if not polygons or not self.map_ctx:
@@ -427,6 +514,15 @@ class _XodrMixin:
         group.setZValue(self.opendrive_item.zValue())
         self._xodr_vector_group = group
         self._xodr_is_vector = True
+
+        # Draw exterior road-boundary marking lines on top of lane polygons.
+        # These replace the per-polygon seam pen as the visual lane marking,
+        # ensuring no lines appear inside roundabout or junction patch areas.
+        self._build_road_marking_items(marking_polylines, min_x, min_y, mpp, group)
+        self._build_center_marking_items(
+            center_marking_polylines, min_x, min_y, mpp, group
+        )
+
         self._apply_opendrive_layer_style()
 
         # Trigger the normal "loading complete" flow
@@ -444,6 +540,85 @@ class _XodrMixin:
         pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         return pen
+
+    def _build_road_marking_items(
+        self,
+        marking_polylines: list,
+        min_x: float,
+        min_y: float,
+        mpp: float,
+        group,
+    ) -> None:
+        """Draw exterior road-boundary marking lines as white cosmetic paths.
+
+        Each polyline in *marking_polylines* is a list of world-coordinate
+        (x, y) tuples representing the exterior contour of the road-surface
+        union.  Items are added as children of *group* so they inherit the
+        group's transform and visibility.
+        """
+        marking_pen = QPen(QColor(255, 255, 255, 220))
+        marking_pen.setCosmetic(True)
+        marking_pen.setWidthF(XODR_MARKING_LINE_WIDTH_PX)
+        marking_pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+        marking_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+
+        for polyline in marking_polylines:
+            if len(polyline) < 2:
+                continue
+            path = QPainterPath()
+            sx0, sy0 = ((polyline[0][0] - min_x) / mpp, (polyline[0][1] - min_y) / mpp)
+            path.moveTo(sx0, sy0)
+            for wx, wy in polyline[1:]:
+                path.lineTo((wx - min_x) / mpp, (wy - min_y) / mpp)
+            item = QGraphicsPathItem(path)
+            item.setPen(marking_pen)
+            item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+            item.setZValue(0.5)  # above lane fills, below signals
+            group.addToGroup(item)
+
+    def _build_center_marking_items(
+        self,
+        center_marking_polylines: list,
+        min_x: float,
+        min_y: float,
+        mpp: float,
+        group,
+    ) -> None:
+        """Draw bidirectional centerline markings on top of lane polygons."""
+        pens = {
+            "white": QPen(QColor(255, 255, 255, 230)),
+            "yellow": QPen(QColor(255, 214, 0, 230)),
+        }
+        for pen in pens.values():
+            pen.setCosmetic(True)
+            pen.setWidthF(XODR_MARKING_LINE_WIDTH_PX)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+
+        for record in center_marking_polylines:
+            if isinstance(record, dict):
+                polyline = list(record.get("points") or [])
+                color_name = str(record.get("color") or "white").lower()
+            else:
+                polyline = list(record or [])
+                color_name = "white"
+            if len(polyline) < 2:
+                continue
+
+            path = QPainterPath()
+            sx0, sy0 = (
+                (polyline[0][0] - min_x) / mpp,
+                (polyline[0][1] - min_y) / mpp,
+            )
+            path.moveTo(sx0, sy0)
+            for wx, wy in polyline[1:]:
+                path.lineTo((wx - min_x) / mpp, (wy - min_y) / mpp)
+
+            item = QGraphicsPathItem(path)
+            item.setPen(pens.get(color_name, pens["white"]))
+            item.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+            item.setZValue(0.55)
+            group.addToGroup(item)
 
     def _set_xodr_item_fill(self, item, brush: QBrush) -> None:
         item.setBrush(brush)
@@ -500,7 +675,17 @@ class _XodrMixin:
         path.addPolygon(poly)
         item = QGraphicsPathItem(path)
         item.setAcceptHoverEvents(True)
-        self._set_xodr_item_fill(item, brush)
+
+        # For road-surface lane types the exterior boundary is drawn separately
+        # as explicit marking lines.  Use a no-border pen so that seam artefacts
+        # (dark lines between adjacent road patches) do not appear inside
+        # roundabouts or junction areas.
+        from open_road_editor.viewer._xodr_renderer import _ROAD_SURFACE_TYPES
+        if lane_type in _ROAD_SURFACE_TYPES:
+            item.setBrush(brush)
+            item.setPen(QPen(Qt.PenStyle.NoPen))
+        else:
+            self._set_xodr_item_fill(item, brush)
 
         topo_key = str(rec.get("topology_lane_key") or lane_key)
         self._xodr_item_meta[item] = (
@@ -821,10 +1006,22 @@ class _XodrMixin:
 
     def _convert_osm_to_xodr(self, osm_path: str) -> str | None:
         try:
+            centerline_style = self._selected_xodr_centerline_marking()
             xodr_fd, xodr_path = tempfile.mkstemp(suffix=".xodr", prefix="osm2xodr_")
             os.close(xodr_fd)
             success, err = self._call_netconvert_conversion(osm_path, xodr_path)
             if success:
+                # Re-add exterior road marks geometrically (strip was done in
+                # the conversion pipeline via strip_all_road_marks).
+                try:
+                    renderer = opendrive_renderer_bindings_py.OpenDriveRenderer()
+                    if renderer.load_map(xodr_path):
+                        renderer.rewrite_exterior_road_marks(
+                            xodr_path,
+                            centerline_style=centerline_style,
+                        )
+                except Exception as _exc:
+                    print(f"rewrite_exterior_road_marks warning: {_exc}")
                 return xodr_path
             QMessageBox.warning(self, "OSM Conversion Failed", err or "Unknown error")
             return None
@@ -908,6 +1105,7 @@ class _XodrMixin:
             return
         self._show_project_status("Converting OSM → OpenDRIVE…")
         my_gen = getattr(self, "_auto_xodr_gen", 0)
+        centerline_style = self._selected_xodr_centerline_marking()
 
         def run():
             try:
@@ -916,6 +1114,19 @@ class _XodrMixin:
                 )
                 if my_gen != getattr(self, "_auto_xodr_gen", 0):
                     return  # superseded by a later drag
+                if success:
+                    # Re-add lane markings geometrically: only the exterior road
+                    # boundary gets a roadMark so internal roundabout/junction
+                    # patch edges stay unmarked in the xodr file as well.
+                    try:
+                        renderer = opendrive_renderer_bindings_py.OpenDriveRenderer()
+                        if renderer.load_map(xodr_path):
+                            renderer.rewrite_exterior_road_marks(
+                                xodr_path,
+                                centerline_style=centerline_style,
+                            )
+                    except Exception as _exc:
+                        print(f"rewrite_exterior_road_marks warning: {_exc}")
                 self.xodr_auto_converted.emit(xodr_path if success else "")
             except Exception:
                 if my_gen == getattr(self, "_auto_xodr_gen", 0):

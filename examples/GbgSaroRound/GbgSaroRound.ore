@@ -8,9 +8,9 @@
     "segment_info_height": 141,
     "node_info_height": 131,
     "segment_info_key_col_width": 145,
-    "display_zoom_pct": 13108,
-    "viewport_center_x": 935.3066829417146,
-    "viewport_center_y": 636.2526701251142,
+    "display_zoom_pct": 20481,
+    "viewport_center_x": 925.2477906352229,
+    "viewport_center_y": 609.8335042234266,
     "settings": {
       "show_esri": true,
       "show_carla_bev": false,
@@ -21,8 +21,8 @@
       "carla_edit_mode": false,
       "server_ip": "localhost",
       "server_port": "8080",
-      "opendrive_alpha": 0.6,
-      "zoom_pct": 13108,
+      "opendrive_alpha": 1.0,
+      "zoom_pct": 20481,
       "show_grid": false,
       "tile_zoom": 18,
       "esri_offset_x": 2.31,
@@ -32,7 +32,7 @@
       "grid_thickness": 2,
       "grid_font_size": 12,
       "grid_sig_digits": 4,
-      "show_osm": true,
+      "show_osm": false,
       "show_osm_objects": true,
       "osm_edit_mode": false,
       "osm_alpha": 0.6,
@@ -85,8 +85,8 @@
       "bound_south": -836.63,
       "bound_east": 1800.0,
       "bound_west": -1200.0,
-      "splitter_map_w": 1191,
-      "splitter_right_w": 647
+      "splitter_map_w": 2175,
+      "splitter_right_w": 1183
     },
     "carla_metadata": {
       "server_meta": {
